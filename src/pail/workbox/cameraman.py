@@ -3,49 +3,25 @@ import os
 import sys
 from six import integer_types, string_types
 
-import maya.mel as mm
-import maya.cmds as mc
+import maya.mel as mel
+import maya.cmds as cmds
 import pymel.all as pm
 import maya.api.OpenMaya as om2
-import maya.OpenMayaUI as omui
 
-import shiboken2
+
+
 from PySide2 import QtCore, QtGui, QtWidgets
 
-
-class Callback(object):
-    def __init__(self, func, *args, **kwargs):
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-
-    def __call__(self, *args):
-        return self.func(*self.args, **self.kwargs)
+from ..crux import camera, main, gui, main, transform, util
+from ..crux.util import Callback, undo_dec
 
 
-def undo_dec(func):
-    '''A decorator that will make commands undoable in maya'''
-
-    def _deco(*args, **kwargs):
-        mc.undoInfo(openChunk=True)
-        funcReturn = None
-        try:
-            funcReturn = func(*args, **kwargs)
-        except:
-            print(sys.exc_info()[1])
-        finally:
-            mc.undoInfo(closeChunk=True)
-            return funcReturn
-
-    return _deco
-
-
-class CamTool_UI(QtWidgets.QMainWindow):
+class CameramanGUI(QtWidgets.QMainWindow):
     def __init__(self, parent):
         QtWidgets.QMainWindow.__init__(self, parent)
         # dockable
         # self.setObjectName('CamTool')
-        pm.mel.eval("colorManagementPrefs -edit -cmEnabled 1")
+        mel.eval("colorManagementPrefs -edit -cmEnabled 1")
         self.callback = None
         self.setWindowTitle('CamTool')
         self.resize(675, 760)
@@ -131,30 +107,30 @@ class CamTool_UI(QtWidgets.QMainWindow):
                 child.setCheckable(1)
 
         self.vis_wireframeOnShaded_QPB.clicked.connect(
-            lambda: set_show_hide(self.update_panel(), 'wireframeOnShaded', self.vis_wireframeOnShaded_QPB.isChecked())
+            lambda: gui.set_show_hide(self.update_panel(), 'wireframeOnShaded', self.vis_wireframeOnShaded_QPB.isChecked())
             )
         self.vis_imagePlane_QPB.clicked.connect(
-            lambda: set_show_hide(self.update_panel(), 'imagePlane', self.vis_imagePlane_QPB.isChecked())
+            lambda: gui.set_show_hide(self.update_panel(), 'imagePlane', self.vis_imagePlane_QPB.isChecked())
             )
         self.vis_gpuCache_QPB.clicked.connect(
-            lambda: set_show_hide(self.update_panel(), 'gpuCache', self.vis_gpuCache_QPB.isChecked())
+            lambda: gui.set_show_hide(self.update_panel(), 'gpuCache', self.vis_gpuCache_QPB.isChecked())
             )
         self.vis_selectionHiliteDisplay_QPB.clicked.connect(
-            lambda: set_show_hide(
+            lambda: gui.set_show_hide(
                 self.update_panel(), 'selectionHiliteDisplay', self.vis_selectionHiliteDisplay_QPB.isChecked()
                 )
             )
         self.vis_nurbsCurves_QPB.clicked.connect(
-            lambda: set_show_hide(self.update_panel(), 'nurbsCurves', self.vis_nurbsCurves_QPB.isChecked())
+            lambda: gui.set_show_hide(self.update_panel(), 'nurbsCurves', self.vis_nurbsCurves_QPB.isChecked())
             )
         self.vis_polymeshes_QPB.clicked.connect(
-            lambda: set_show_hide(self.update_panel(), 'polymeshes', self.vis_polymeshes_QPB.isChecked())
+            lambda: gui.set_show_hide(self.update_panel(), 'polymeshes', self.vis_polymeshes_QPB.isChecked())
             )
         self.vis_cameras_QPB.clicked.connect(
-            lambda: set_show_hide(self.update_panel(), 'camera', self.vis_cameras_QPB.isChecked())
+            lambda: gui.set_show_hide(self.update_panel(), 'camera', self.vis_cameras_QPB.isChecked())
             )
         self.vis_locators_QPB.clicked.connect(
-            lambda: set_show_hide(self.update_panel(), 'locators', self.vis_locators_QPB.isChecked())
+            lambda: gui.set_show_hide(self.update_panel(), 'locators', self.vis_locators_QPB.isChecked())
             )
 
         add_separator(self.sep_layoutWidget, 10)
@@ -167,7 +143,7 @@ class CamTool_UI(QtWidgets.QMainWindow):
         self.colorspace_QCombo.addItems(['Raw', 'sRGB', 'ACES2065-1'])
 
         self.colorspace_QCombo.currentIndexChanged.connect(
-            lambda: set_colorspace(self.get_image_plane(), self.colorspace_QCombo.currentText())
+            lambda: camera.set_colorspace(self.get_image_plane(), self.colorspace_QCombo.currentText())
             )
 
         # function set: color space mode of image plane
@@ -177,20 +153,20 @@ class CamTool_UI(QtWidgets.QMainWindow):
         self.display_mode_QCombo.addItems(['None', 'Outline', 'RGB', 'RGBA', 'Luminance', 'Alpha'])
 
         self.display_mode_QCombo.currentIndexChanged.connect(
-            lambda: set_colorspace_display_mode(self.get_image_plane(), self.display_mode_QCombo.currentIndex())
+            lambda: camera.set_colorspace_display_mode(self.get_image_plane(), self.display_mode_QCombo.currentIndex())
             )
 
         # function set: Toggle look thru to force image plane to refresh
         self.func_setLookThru = FuncLayout(self.right_widget)
         self.setLookThru_QPB = self.func_setLookThru.add(QtWidgets.QPushButton('Set Look Thru'))
 
-        self.setLookThru_QPB.clicked.connect(lambda: look_thru(self.get_image_plane()))
+        self.setLookThru_QPB.clicked.connect(lambda: camera.look_thru(self.get_image_plane()))
 
         # function set: reload image sequence by disconnecting frame expression
         self.func_reloadIS = FuncLayout(self.right_widget)
         self.reloadIS_QPB = self.func_reloadIS.add(QtWidgets.QPushButton('Reload image sequence'))
 
-        self.reloadIS_QPB.clicked.connect(lambda: reload_image_sequence(self.get_image_plane()))
+        self.reloadIS_QPB.clicked.connect(lambda: camera.reload_image_sequence(self.get_image_plane()))
 
         # function set: image path
         self.func_imageName = FuncLayout(self.right_widget)
@@ -241,12 +217,12 @@ class CamTool_UI(QtWidgets.QMainWindow):
         self.func_clipPlane._layout.setStretch(2, 1)
 
         self.nearClipPlane_QDSB.valueChanged.connect(
-            lambda: set_clip_plane(
+            lambda: camera.set_clip_plane(
                 self.get_cam().getShape(), self.nearClipPlane_QDSB.value(), self.farClipPlane_QDSB.value()
                 )
             )
         self.farClipPlane_QDSB.valueChanged.connect(
-            lambda: set_clip_plane(
+            lambda: camera.set_clip_plane(
                 self.get_cam().getShape(), self.nearClipPlane_QDSB.value(), self.farClipPlane_QDSB.value()
                 )
             )
@@ -256,8 +232,8 @@ class CamTool_UI(QtWidgets.QMainWindow):
         self.lockTransform_QPB = self.func_lockTransform.add(QtWidgets.QPushButton('Lock'))
         self.unlockTransform_QPB = self.func_lockTransform.add(QtWidgets.QPushButton('Unlock'))
 
-        self.lockTransform_QPB.clicked.connect((lambda: lock_cam_tsf(self.get_cam(), 1)))
-        self.unlockTransform_QPB.clicked.connect(lambda: unlock_cam_shapes(self.get_cam()))
+        self.lockTransform_QPB.clicked.connect((lambda: camera.lock_cam_tsf(self.get_cam(), 1)))
+        self.unlockTransform_QPB.clicked.connect(lambda: transform.unlock_shapes(self.get_cam()))
 
         # function set: rotate order of cam
         self.func_rotateOrder = FuncLayout(self.right_widget)
@@ -274,6 +250,15 @@ class CamTool_UI(QtWidgets.QMainWindow):
         self.bake_cam_QPB.clicked.connect(self.bake_cam)
 
         add_separator(self.right_widget, 10)
+
+        self.func_bake_scale = FuncLayout(self.right_widget)
+        self.reset_scale = self.func_bake_scale.add(QtWidgets.QCheckBox("Reset Scale"))
+        self.reset_scale.setChecked(True)
+        self.rep_world_bake_btn = self.func_bake_scale.add(QtWidgets.QPushButton("Bake"))
+        self.rep_world_bake_btn.clicked.connect(self.bake_cam_world)
+
+        add_separator(self.right_widget, 10)
+
         # spacer to push all function set upward
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.right_layout.addItem(spacerItem)
@@ -296,11 +281,21 @@ class CamTool_UI(QtWidgets.QMainWindow):
         self.update_cam_sets()
 
     def change_cam_rotateOrder(self):
-        set_rotate_order(self.get_cam(), self.rotateOrder_QCombo.currentText())
+        transform.set_rotate_order(self.get_cam(), self.rotateOrder_QCombo.currentText())
+
+    def bake_cam_world(self):
+        cam = self.get_cam()
+        if not cam:
+            util.warning('No active camera', ui=self.statusBar)
+            return
+        camera.bake_to_world2(
+            str(cam),
+            reset_scale=self.reset_scale.isChecked()
+        )
 
     @undo_dec
     def bake_cam(self):
-        bake_to_world(self.get_cam())
+        transform.bake_to_world(self.get_cam())
 
     def enterEvent(self, event):
         """ Update panel show/hide option when mouse enter the UI """
@@ -308,15 +303,15 @@ class CamTool_UI(QtWidgets.QMainWindow):
         if not current_panel:
             return
         self.vis_gpuCache_QPB.setChecked(
-            bool(mc.modelEditor(current_panel, q=1, queryPluginObjects='gpuCacheDisplayFilter'))
+            bool(cmds.modelEditor(current_panel, q=1, queryPluginObjects='gpuCacheDisplayFilter'))
             )
-        self.vis_imagePlane_QPB.setChecked(bool(mc.modelEditor(current_panel, q=1, imagePlane=1)))
-        self.vis_wireframeOnShaded_QPB.setChecked(bool(mc.modelEditor(current_panel, q=1, wireframeOnShaded=1)))
-        self.vis_nurbsCurves_QPB.setChecked(bool(mc.modelEditor(current_panel, q=1, nurbsCurves=1)))
-        self.vis_polymeshes_QPB.setChecked(bool(mc.modelEditor(current_panel, q=1, polymeshes=1)))
-        self.vis_cameras_QPB.setChecked(bool(mc.modelEditor(current_panel, q=1, cameras=1)))
+        self.vis_imagePlane_QPB.setChecked(bool(cmds.modelEditor(current_panel, q=1, imagePlane=1)))
+        self.vis_wireframeOnShaded_QPB.setChecked(bool(cmds.modelEditor(current_panel, q=1, wireframeOnShaded=1)))
+        self.vis_nurbsCurves_QPB.setChecked(bool(cmds.modelEditor(current_panel, q=1, nurbsCurves=1)))
+        self.vis_polymeshes_QPB.setChecked(bool(cmds.modelEditor(current_panel, q=1, polymeshes=1)))
+        self.vis_cameras_QPB.setChecked(bool(cmds.modelEditor(current_panel, q=1, cameras=1)))
         self.vis_selectionHiliteDisplay_QPB.setChecked(
-            bool(mc.modelEditor(current_panel, q=1, selectionHiliteDisplay=1))
+            bool(cmds.modelEditor(current_panel, q=1, selectionHiliteDisplay=1))
             )
         self.update_cam_sets()
         self.update_imagePlane_sets()
@@ -333,8 +328,8 @@ class CamTool_UI(QtWidgets.QMainWindow):
     @undo_dec
     def set_image_name(self, text):
         """ Set path of imagePlane """
-        if not set_image_name(self.get_image_plane(), text):
-            warning('image not exists', ui=self.statusBar)
+        if not camera.set_image_name(self.get_image_plane(), text):
+            util.warning('image not exists', ui=self.statusBar)
             self.imageName_QLE.setText('')
             return
         self.imageName_QLE.setText(text)
@@ -368,7 +363,7 @@ class CamTool_UI(QtWidgets.QMainWindow):
         if not src.isValid():
             self.block_signal(0)
             return
-        cam = pm.PyNode(mobj2(src, 'fullPath'))
+        cam = pm.PyNode(main.mobj2(src, 'fullPath'))
         cam_scale = cam.cameraScale.get()
         self.camScale.setText('  {}  '.format(cam_scale))
         if not cam_scale == 1.:
@@ -430,7 +425,7 @@ class CamTool_UI(QtWidgets.QMainWindow):
         if current_colorpsace in ['Raw', 'sRGB', 'ACES2065-1']:
             self.colorspace_QCombo.setCurrentIndex({'Raw': 0, 'sRGB': 1, 'ACES2065-1': 2}[imagePlane.colorSpace.get()])
         else:
-            warning("Colorspace is not one of 'Raw','sRGB','ACES2065-1', the UI wont update", self.statusBar)
+            util.warning("Colorspace is not one of 'Raw','sRGB','ACES2065-1', the UI wont update", self.statusBar)
         self.fit_QCombo.setCurrentIndex(imagePlane.fit.get())
         self.display_mode_QCombo.setCurrentIndex(
             {'None': 0, 'Outline': 1, 'RGB': 2, 'RGBA': 3, 'Luminance': 4, 'Alpha': 5}[
@@ -467,9 +462,9 @@ class CamTool_UI(QtWidgets.QMainWindow):
             return
         sl = sl[0]
         if listWidget == self.cam_listWidget:
-            pm.select(handle_tsf(sl.src, 'fullPath'))
+            pm.select(main.handle_tsf(sl.src, 'fullPath'))
         else:
-            pm.select(imagePlane_to_pynode(mobj2(sl.src, 'mobj'))[-1])
+            pm.select(imagePlane_to_pynode(main.mobj2(sl.src, 'mobj'))[-1])
         return sl.src
 
     def rClick_cam(self, QPos):
@@ -515,26 +510,14 @@ class CamTool_UI(QtWidgets.QMainWindow):
         """ create new imagePlane for selected(UI) camera """
         cam = self.get_cam()
         if not cam:
-            warning('No active camera', ui=self.statusBar)
+            util.warning('No active camera', ui=self.statusBar)
             return
         return pm.imagePlane(camera=cam)
 
     def create_new_cam(self, at_lookAt=True):
         """ Create new camera """
         panel = self.update_panel()
-        cam = None
-        if not panel:
-            at_lookAt = False
-        else:
-            current_cam = mc.modelPanel(panel, q=1, cam=1)
-            if not current_cam:
-                at_lookAt = False
-        new_cam = pm.createNode('camera').getParent()
-        if at_lookAt:
-            pm.xform(new_cam, ws=1, t=pm.xform(current_cam, q=1, ws=1, t=1))
-            pm.xform(new_cam, ws=1, ro=pm.xform(current_cam, q=1, ws=1, ro=1))
-            pm.move(new_cam, (0, 0, pm.PyNode(current_cam).centerOfInterest.get() * -1), r=1, os=1, wd=1)
-            [i.set(0) for i in new_cam.r.children()]
+        new_cam = camera.create_new_cam(panel, at_lookAt=at_lookAt)
         return new_cam
 
     @undo_dec
@@ -543,12 +526,12 @@ class CamTool_UI(QtWidgets.QMainWindow):
         panel = self.update_panel()
         src = list_widget.currentItem().src
         if not panel:
-            warning('Haven\'t got an active panel.')
+            util.warning('Haven\'t got an active panel.')
             return
         if not src.isValid():
             return
-        fp = mobj2(get_parent(src.object()), 'fullPath')
-        mm.eval('lookThroughModelPanel {} {}'.format(fp, self.update_panel()))
+        fp = main.mobj2(main.get_parent(src.object()), 'fullPath')
+        mel.eval('lookThroughModelPanel {} {}'.format(fp, self.update_panel()))
 
     @undo_dec
     def rename_item(self, list_widget, n=None):
@@ -556,16 +539,16 @@ class CamTool_UI(QtWidgets.QMainWindow):
         t = list_widget.currentItem().text()
         result = 'OK'
         if not n:
-            result = mc.promptDialog(
+            result = cmds.promptDialog(
                 title='Rename', text=t, message='Enter Name:', button=['OK', 'Cancel'], defaultButton='OK',
                 cancelButton='Cancel', dismissString='Cancel'
                 )
-            n = mc.promptDialog(query=True, text=True)
+            n = cmds.promptDialog(query=True, text=True)
         if not n or result == 'Cancel':
             return
-        for c, i in enumerate(mc.ls(n)):
-            mc.rename(i, "{}_{}".format(n, c + 1))
-        mobj2(get_parent(list_widget.currentItem().src.object()), 'fn').setName(n)
+        for c, i in enumerate(cmds.ls(n)):
+            cmds.rename(i, "{}_{}".format(n, c + 1))
+        main.mobj2(main.get_parent(list_widget.currentItem().src.object()), 'fn').setName(n)
         # list_widget.currentItem().setText(n)
         list_widget.update_names()
 
@@ -576,9 +559,9 @@ class CamTool_UI(QtWidgets.QMainWindow):
         if not item:
             return
         list_widget.selectionModel().clear()
-        fp = mobj2(get_parent(item.src.object()), 'fullPath')
-        mc.delete(fp)
-        if not mc.objExists(fp):
+        fp = main.mobj2(main.get_parent(item.src.object()), 'fullPath')
+        cmds.delete(fp)
+        if not cmds.objExists(fp):
             list_widget.takeItem(list_widget.row(item))
         list_widget.update_names()
 
@@ -588,7 +571,7 @@ class CamTool_UI(QtWidgets.QMainWindow):
         status = self.prior_QPB.isChecked() if force == None else force
         type_list = ['camera', 'imagePlane']
         mType = [om2.MFn.kCamera, om2.MFn.kImagePlane][status]
-        lss = api_ls('mobj', obj_type=mType)
+        lss = main.api_ls('mobj', obj_type=mType)
         widget_list = [self.cam_listWidget, self.imagePlane_listWidget]
         self.prior_QPB.setText(['Camera first', 'imagePlane first'][status])
         scroll_as = self.cam_listWidget.scrollArea, self.imagePlane_listWidget.scrollArea
@@ -598,9 +581,9 @@ class CamTool_UI(QtWidgets.QMainWindow):
         self.cam_listWidget.clear()
         remove_skip_cam = []
         for cam in lss:
-            sn = mobj2(cam, 'shortName')
+            sn = main.mobj2(cam, 'shortName')
             if not 'shakeCam' in sn and not 'tweakCam' in sn:
-                widget_list[status].add(mobj2(cam, 'handle'))
+                widget_list[status].add(main.mobj2(cam, 'handle'))
         self.block_signal(0)
 
     def click_update(self, listWidget):
@@ -646,14 +629,14 @@ class CamTool_UI(QtWidgets.QMainWindow):
     def update_panel(self):
         """ Get current panel, if its a modelPanel, update the self.last_active_panel
             if not, return the self.last_active_panel (use the previous current panel) """
-        current_panel = mc.getPanel(withFocus=1)
+        current_panel = cmds.getPanel(withFocus=1)
         self.last_active_panel = current_panel if 'modelPanel' in current_panel else self.last_active_panel
         return self.last_active_panel
 
     def get_active_cam(self):
         """ get the camera from the self.last_active_panel """
         panel = self.update_panel()
-        cam = mc.modelPanel(panel, q=1, camera=1)
+        cam = cmds.modelPanel(panel, q=1, camera=1)
         cam = pm.PyNode(cam).getParent() if cam else None
         return cam
 
@@ -661,7 +644,7 @@ class CamTool_UI(QtWidgets.QMainWindow):
         """ get camera PyNode from listWidget """
         cam = None
         if not self.cam_listWidget.count():
-            warning('You have no cam in cam list.', ui=self.statusBar)
+            util.warning('You have no cam in cam list.', ui=self.statusBar)
             return None
         sl_items = self.cam_listWidget.selectedItems()
         if sl_items:
@@ -670,16 +653,16 @@ class CamTool_UI(QtWidgets.QMainWindow):
             if self.cam_listWidget.count() == 1:
                 cam = self.cam_listWidget.item(0).src
             else:
-                warning('You haven\'t select any camera in the list', ui=self.statusBar)
+                util.warning('You haven\'t select any camera in the list', ui=self.statusBar)
                 return None
-        cam = pm.PyNode(mobj2(cam, 'fullPath')).getParent()
+        cam = pm.PyNode(main.mobj2(cam, 'fullPath')).getParent()
         return cam
 
     def get_image_plane(self):
         """ get imagePlane PyNode from listWidget """
         imagePlane = None
         if not self.imagePlane_listWidget.count():
-            warning('You have no imagePlane in list.', ui=self.statusBar)
+            util.warning('You have no imagePlane in list.', ui=self.statusBar)
             return None
         sl_items = self.imagePlane_listWidget.selectedItems()
         if sl_items:
@@ -688,7 +671,7 @@ class CamTool_UI(QtWidgets.QMainWindow):
             if self.imagePlane_listWidget.count() == 1:
                 imagePlane = self.imagePlane_listWidget.item(0).src
             else:
-                warning('You haven\'t select any camera in the list', ui=self.statusBar)
+                util.warning('You haven\'t select any camera in the list', ui=self.statusBar)
                 return None
         imagePlane = imagePlane_to_pynode(imagePlane)[-1]
         return imagePlane
@@ -710,16 +693,16 @@ class ListWidget(QtWidgets.QListWidget):
 
     def add(self, item):
         """ Shortcut to add QtWidgets"""
-        self.addItem(handle_tsf(item, 'shortName'))
-        p_path = handle_tsf(item, 'partialPath')
+        self.addItem(main.handle_tsf(item, 'shortName'))
+        p_path = main.handle_tsf(item, 'partialPath')
         last = self.list_items()[2][-1]
         last.setToolTip(p_path)
         try:
-            if mc.camera(p_path, q=1, startupCamera=1):
+            if cmds.camera(p_path, q=1, startupCamera=1):
                 last.setForeground(QtGui.QColor('grey'))
         except:
             pass
-        last.src = mobj2(item, 'handle')
+        last.src = main.mobj2(item, 'handle')
         return last
 
     def update_names(self):
@@ -729,8 +712,8 @@ class ListWidget(QtWidgets.QListWidget):
             if not item.src.isValid():
                 self.takeItem(self.row(item))
             else:
-                item.setToolTip(handle_tsf(item.src, 'partialPath'))
-                item.setText(handle_tsf(item.src, 'shortName'))
+                item.setToolTip(main.handle_tsf(item.src, 'partialPath'))
+                item.setText(main.handle_tsf(item.src, 'shortName'))
 
     def list_items(self):
         """ list different types of item """
@@ -739,7 +722,7 @@ class ListWidget(QtWidgets.QListWidget):
         for item in items:
             if hasattr(item, 'src'):
                 src.append(item.src)
-                full_path_names.append(mobj2(item.src, 'fullPath'))
+                full_path_names.append(main.mobj2(item.src, 'fullPath'))
             else:
                 src.append(None)
                 full_path_names.append(None)
@@ -763,7 +746,7 @@ class ListWidget(QtWidgets.QListWidget):
         elif isinstance(input, QtWidgets.QListWidgetItem):
             self.setCurrentItem(input)
         elif isinstance(input, om2.MObject):
-            idx = self.list_items()[3].index(mobj2(input, 'fullPath'))
+            idx = self.list_items()[3].index(main.mobj2(input, 'fullPath'))
             self.setCurrentItem(self.item(idx))
 
     def remove(self, input):
@@ -799,24 +782,6 @@ def set_font_size(widget, font_size):
     return widget
 
 
-def get_maya_ui_long_name(QtWidget):
-    return omui.MQtUtil.fullName(integer_types[-1](shiboken2.getCppPointer(QtWidget)[0]))
-
-
-def warning(msg, ui=None, lasts=3000):
-    mc.inViewMessage(smg='<hl>{}</hl>'.format(msg), fade=1, pos='topCenter')
-    mc.warning(msg)
-    if ui:
-        ui.showMessage(msg, lasts)
-    return msg
-
-
-def get_maya_window():
-    ptr = omui.MQtUtil.mainWindow()
-    if ptr is not None:
-        return shiboken2.wrapInstance(integer_types[-1](ptr), QtWidgets.QMainWindow)
-
-
 def assign_bg_color(widget, color):
     styleSheet = widget.styleSheet()
     if 'background-color:' in styleSheet:
@@ -841,70 +806,12 @@ def init_window():
     #  dockable
     # if not 'customMixinWindow' in globals():
     #     customMixinWindow = None
-    ui = CamTool_UI(get_maya_window())
+    ui = CameramanGUI(gui.get_maya_window())
     ui.setAttribute(QtCore.Qt.WA_DeleteOnClose)
     # dockable
     # ui.show(dockable=True)
     ui.show()
     return ui
-
-
-def mobj2(obj, return_type):
-    def get(obj, return_type):
-        if return_type == 'shortName':
-            return om2.MFnDependencyNode(obj).name()
-        elif return_type == 'fullPath':
-            return om2.MDagPath.getAPathTo(obj).fullPathName()
-        elif return_type == 'fn':
-            return om2.MFnDependencyNode(obj)
-        elif return_type == 'partialPath':
-            return om2.MDagPath.getAPathTo(obj).partialPathName()
-        elif return_type == 'handle':
-            return om2.MObjectHandle(obj)
-        elif return_type == 'dagPath':
-            return om2.MDagPath.getAPathTo(obj)
-        elif return_type == 'dagFn':
-            return om2.MFnDagNode(obj)
-        elif return_type == 'mobj':
-            return obj
-
-    def convert(obj):
-        if isinstance(obj, om2.MDagPath):
-            return obj.node()
-        if isinstance(obj, om2.MObjectHandle):
-            return obj.object()
-        elif isinstance(obj, om2.MObject):
-            return obj
-        elif isinstance(obj, string_types):
-            return get_depend_node(obj)
-        elif isinstance(obj, (list, tuple)):
-            return [convert(o) for o in obj]
-        elif isinstance(obj, om2.MObjectArray):
-            return [convert(obj[c]) for c in range(len(obj))]
-        else:
-            raise TypeError(obj)
-
-    obj = convert(obj)
-    if isinstance(obj, list):
-        return [get(o, return_type) for o in obj]
-    elif isinstance(obj, om2.MObject):
-        return get(obj, return_type)
-    else:
-        raise TypeError(obj)
-
-
-def get_depend_node(name_str):
-    node = []
-    if isinstance(name_str, list):
-        for name in name_str:
-            selection = om2.MSelectionList()
-            selection.add(name)
-        node = [selection.getDependNode(c) for c in range(len(name_str))]
-    else:
-        selection = om2.MSelectionList()
-        selection.add(name_str)
-        node = selection.getDependNode(0)
-    return node
 
 
 def selection_changed_cam_tool(*args, **kwargs):
@@ -914,8 +821,8 @@ def selection_changed_cam_tool(*args, **kwargs):
     if not sel_list.length():
         return None, None
     last = sel_list.getDependNode(sel_list.length() - 1)
-    return_cam = get_nodes_tsf(last, om2.MFn.kCamera)
-    return_imagePlane = get_nodes_tsf(last, om2.MFn.kImagePlane)
+    return_cam = main.get_nodes_tsf(last, om2.MFn.kCamera)
+    return_imagePlane = main.get_nodes_tsf(last, om2.MFn.kImagePlane)
     if return_cam:
         update_ui(return_cam, mode='cam', ui=ui)
     if return_imagePlane:
@@ -932,14 +839,14 @@ def update_ui(node, mode='cam', ui=None):
     ui.switch_lists(force=ui.prior_QPB.isChecked())
     _, _, _, full_path = updating_listWidget.list_items()
     item = [updating_listWidget.item(i) for i in range(updating_listWidget.count())]
-    fp = mobj2(node, 'fullPath')
+    fp = main.mobj2(node, 'fullPath')
     if fp in full_path:
         updating_listWidget.set_selected(updating_listWidget.item(full_path.index(fp)))
     else:
         connected = get_connected_cmd(node)
         if connected:
             connected = connected[0]
-        connected_fp = mobj2(connected, 'fullPath')
+        connected_fp = main.mobj2(connected, 'fullPath')
         all_fp = listWidget[1 - index].list_items()[3]
         if not connected_fp in all_fp:
             return
@@ -952,7 +859,7 @@ def update_ui(node, mode='cam', ui=None):
 def get_connected_cam(imagePlane):
     """ get camera by given object's message connection (and has to be a camera node)"""
     connected = []
-    fn = mobj2(imagePlane, 'fn')
+    fn = main.mobj2(imagePlane, 'fn')
     plug = fn.findPlug('message', False)
     for i in plug.connectedTo(0, 1):
         if i.node().hasFn(om2.MFn.kCamera):
@@ -963,7 +870,7 @@ def get_connected_cam(imagePlane):
 def get_connected_imagePlane(cam):
     """ get imagePlane by given object's imagePlane attribute connection (and has to be a imagePlane node) """
     connected = []
-    fn = mobj2(cam, 'fn')
+    fn = main.mobj2(cam, 'fn')
     plug = fn.findPlug('imagePlane', False)
     for c in range(plug.numConnectedElements()):
         for connected_plug in plug.connectionByPhysicalIndex(c).connectedTo(1, 0):
@@ -972,216 +879,27 @@ def get_connected_imagePlane(cam):
     return connected
 
 
-def get_selection():
-    """ API get selection """
-    sel_list = om2.MGlobal.getActiveSelectionList()
-    return [(sel_list.getDependNode(c)) for c in range(sel_list.length())]
-
-
-def get_shape(mObj):
-    """ get the shape of given object, if it's already a shape, return itself"""
-    shapes = []
-    if mObj.hasFn(om2.MFn.kTransform):
-        for c in range(mobj2(mObj, 'dagPath').numberOfShapesDirectlyBelow()):
-            shapes.append(mobj2(mObj, 'dagPath').extendToShape(c).node())
-    elif mObj.hasFn(om2.MFn.kShape):
-        shapes.append(mObj)
-    return shapes
-
-
-def get_parent(mObj):
-    """ as title """
-    return mobj2(mObj, 'dagFn').parent(0)
-
-
-def api_ls(return_type, obj_type=None):
-    """ ls object by API"""
-    dagIterator = om2.MItDependencyNodes(obj_type)
-    result = []
-    while (not dagIterator.isDone()):
-        current = dagIterator.thisNode()
-        result.append(current)
-        dagIterator.next()
-    return [mobj2(i, return_type) for i in result]
-
-
 def imagePlane_to_pynode(imagePlane):
     """ Convert the given imagePlane to pynode, use list index since pymel might get duplicate naming error"""
     imagePlane_parent = None
-    imagePlane = mobj2(imagePlane, 'fullPath')
-    imagePlane_strings = mc.ls(type='imagePlane', long=1, ap=1)
+    imagePlane = main.mobj2(imagePlane, 'fullPath')
+    imagePlane_strings = cmds.ls(type='imagePlane', long=1, ap=1)
     if imagePlane in imagePlane_strings:
         index = imagePlane_strings.index(imagePlane)
         imagePlane = pm.ls(type='imagePlane')[index]
     return imagePlane_parent, imagePlane
 
 
-def handle_tsf(handle, nodeType):
-    return mobj2(get_parent(mobj2(handle, 'mobj')), nodeType)
-
-
-def get_nodes_tsf(obj, returnType):
-    """ Return the shape node, even if you select its tranform parent"""
-    returnV = None
-    if not obj.hasFn(om2.MFn.kDagNode):
-        return
-    if obj.hasFn(returnType):
-        returnV = obj
-    else:
-        slDagPath = mobj2(obj, 'dagPath')
-        if not slDagPath.numberOfShapesDirectlyBelow():
-            return None
-        shape = slDagPath.extendToShape(0)
-        if shape.hasFn(returnType):
-            returnV = shape
-    return returnV
-
-
-def look_thru(imagePlane):
-    imagePlane.displayOnlyIfCurrent.set(0)
-    imagePlane.displayOnlyIfCurrent.set(1)
-
-
-def set_colorspace(imagePlane, colorspace):
-    pm.mel.eval("colorManagementPrefs -edit -cmEnabled 1")
-    imagePlane.colorSpace.set(colorspace)
-
-
-def set_colorspace_display_mode(imagePlane, mode):
-    if not isinstance(mode, integer_types):
-        mode = {'None': 0, 'RGB': 2, 'RGBA': 3}[mode]
-    imagePlane.displayMode.set(mode)
-
-
-@undo_dec
-def reload_image_sequence(imagePlane, ui=None):
-    imagePlane.frameExtension.unlock()
-    pm.delete(imagePlane.frameExtension.listConnections())
-    mc.setAttr(imagePlane.name() + '.useFrameExtension', 1)
-    # pm.mel.eval(imagePlane.name())
-    pm.mel.eval('ogs -reset')
-    evaluate_expression()
-
-
-def set_image_name(imagePlane, text):
-    if os.path.isfile(text):
-        imagePlane.useFrameExtension.set(0)
-        imagePlane.imageName.set(text)
-        imagePlane.useFrameExtension.set(1)
-        return True
-    elif text == '':
-        imagePlane.imageName.set(text)
-        imagePlane.useFrameExtension.set(0)
-        return True
-    else:
-        return False
-    # reload_image_sequence(imagePlane)
-
-
-@undo_dec
-def set_clip_plane(cam, near, far):
-    cam.nearClipPlane.set(near)
-    cam.farClipPlane.set(far)
-    return cam, near, far
-
-
-@undo_dec
-def lock_cam_tsf(cam, lock_it=True):
-    for attr in cam.t, cam.r:
-        attr.setLocked(lock_it)
-        for child in attr.children():
-            child.setLocked(lock_it)
-    camShape = cam.getShape()
-    camShape.hfa.setLocked(lock_it)
-    camShape.vfa.setLocked(lock_it)
-    camShape.fl.setLocked(lock_it)
-    camShape.lsr.setLocked(lock_it)
-
-
-def set_rotate_order(transform, ro):
-    if isinstance(ro, (float, int)):
-        ro = int(ro)
-    elif isinstance(ro, string_types):
-        ro = dict(xyz=0, yzx=1, zxy=2, xzy=3, yxz=4, zyx=5)[ro]
-    transform.ro.set(ro)
-
-
-def set_show_hide(panel, obj_type, state):
-    if not panel:
-        warning('You have to ACTIVE a panel')
-        return
-    if obj_type == 'nurbsCurves':
-        mc.modelEditor(panel, e=1, nurbsCurves=state)
-    if obj_type == 'polymeshes':
-        mc.modelEditor(panel, e=1, polymeshes=state)
-    if obj_type == 'locators':
-        mc.modelEditor(panel, e=1, locators=state)
-    if obj_type == 'camera':
-        mc.modelEditor(panel, e=1, cameras=state)
-    if obj_type == 'selectionHiliteDisplay':
-        mc.modelEditor(panel, e=1, selectionHiliteDisplay=state)
-    if obj_type == 'wireframeOnShaded':
-        mc.modelEditor(panel, e=1, wireframeOnShaded=state)
-    if obj_type == 'imagePlane':
-        mc.modelEditor(panel, e=1, imagePlane=state)
-    if obj_type == 'gpuCache':
-        mc.modelEditor(panel, e=1, pluginObjects=('gpuCacheDisplayFilter', state))
-
-
-def unlock_all(obj):
-    for attr in obj.listAttr(locked=1):
-        try:
-            attr.unlock()
-        except:
-            warning('{} is unlockable'.format(attr))
-
-
-@undo_dec
-def bake_to_world(transform, mode='keyRange'):
-    all_vec, all_rVec = [], []
-    temp_loc = pm.spaceLocator()
-    cst = pm.parentConstraint(transform, temp_loc, mo=0)
-    f_start, f_end = pm.playbackOptions(q=1, min=1), pm.playbackOptions(q=1, max=1)
-    for i in range(int(f_start), int(f_end + 1)):
-        all_vec.append(temp_loc.t.get(t=i))
-        all_rVec.append(temp_loc.r.get(t=i))
-    pm.delete(temp_loc)
-    transform.setParent(w=1)
-    for ats in transform.t, transform.r:
-        ats.unlock()
-        pm.cutKey(ats)
-        [attr.unlock() for attr in ats.children()]
-        [pm.cutKey(attr) for attr in ats.children()]
-    for c in range(int(f_start), int(f_end + 1)):
-        pm.setKeyframe(transform, t=c, at='tx', v=all_vec[c - int(f_start)][0])
-        pm.setKeyframe(transform, t=c, at='ty', v=all_vec[c - int(f_start)][1])
-        pm.setKeyframe(transform, t=c, at='tz', v=all_vec[c - int(f_start)][2])
-        pm.setKeyframe(transform, t=c, at='rx', v=all_rVec[c - int(f_start)][0])
-        pm.setKeyframe(transform, t=c, at='ry', v=all_rVec[c - int(f_start)][1])
-        pm.setKeyframe(transform, t=c, at='rz', v=all_rVec[c - int(f_start)][2])
-
-
-def evaluate_expression():
-    [pm.dgeval(i) for i in pm.ls(type='expression')]
-
-
-@undo_dec
-def unlock_cam_shapes(cam_tsf):
-    unlock_all(cam_tsf)
-    for shape in cam_tsf.getShapes():
-        unlock_all(shape)
-
-
-def main():
-    global camtool_ui
+def show():
+    global cameraman_gui
     try:
-        camtool_ui.close()
+        cameraman_gui.close()
     except:
         pass
-    camtool_ui = init_window()
-    camtool_ui.switch_lists(force=0)
-    return camtool_ui
+    cameraman_gui = init_window()
+    cameraman_gui.switch_lists(force=0)
+    return cameraman_gui
 
 
 if __name__ == '__main__':
-    main()
+    show()
