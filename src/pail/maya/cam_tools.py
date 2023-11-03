@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
+from six import integer_types, string_types
+
 import maya.mel as mm
 import maya.cmds as mc
 import pymel.all as pm
 import maya.api.OpenMaya as om2
 import maya.OpenMayaUI as omui
+
 import shiboken2
 from PySide2 import QtCore, QtGui, QtWidgets
 # dockable
@@ -33,7 +37,7 @@ def undo_dec(func):
         try:
             funcReturn = func(*args, **kwargs)
         except:
-            print sys.exc_info()[1]
+            print(sys.exc_info()[1])
         finally:
             mc.undoInfo(closeChunk=True)
             return funcReturn
@@ -754,9 +758,9 @@ class ListWidget(QtWidgets.QListWidget):
 
     def set_selected(self, input):
         """ set selected by different types of input should be implemented more """
-        if isinstance(input, int):
+        if isinstance(input, integer_types):
             self.setCurrentItem(self.item(input))
-        elif isinstance(input, (unicode, str)):
+        elif isinstance(input, string_types):
             names = self.list_items()[0]
             self.setCurrentItem(self.item(names.index(input)))
         elif isinstance(input, QtWidgets.QListWidgetItem):
@@ -767,9 +771,9 @@ class ListWidget(QtWidgets.QListWidget):
 
     def remove(self, input):
         """ remove selected by different types of input should be implemented more """
-        if not isinstance(input, int):
+        if not isinstance(input, integer_types):
             names = [i[0] for i in self.list_items()]
-            if isinstance(input, (unicode, str)):
+            if isinstance(input, string_types):
                 input = names.index(input)
             elif isinstance(input, QtWidgets.QListWidgetItem):
                 input = names.index(input.text())
@@ -799,7 +803,7 @@ def set_font_size(widget,font_size):
 
 
 def get_maya_ui_long_name(QtWidget):
-    return omui.MQtUtil.fullName(long(shiboken2.getCppPointer(QtWidget)[0]))
+    return omui.MQtUtil.fullName(integer_types[-1](shiboken2.getCppPointer(QtWidget)[0]))
 
 
 def warning(msg, ui=None, lasts=3000):
@@ -813,7 +817,7 @@ def warning(msg, ui=None, lasts=3000):
 def get_maya_window():
     ptr = omui.MQtUtil.mainWindow()
     if ptr is not None:
-        return shiboken2.wrapInstance(long(ptr), QtWidgets.QMainWindow)
+        return shiboken2.wrapInstance(integer_types[-1](ptr), QtWidgets.QMainWindow)
 
 
 def assign_bg_color(widget, color):
@@ -878,7 +882,7 @@ def mobj2(obj,return_type):
             return obj.object()
         elif isinstance(obj, om2.MObject):
             return obj
-        elif isinstance(obj, (str,unicode)):
+        elif isinstance(obj, string_types):
             return get_depend_node(obj)
         elif isinstance(obj, (list,tuple)):
             return [convert(o) for o in obj]
@@ -1055,7 +1059,7 @@ def set_colorspace(imagePlane, colorspace):
 
 
 def set_colorspace_display_mode(imagePlane, mode):
-    if not isinstance(mode, int):
+    if not isinstance(mode, integer_types):
         mode = {'None':0,'RGB':2,'RGBA':3}[mode]
     imagePlane.displayMode.set(mode)
 
@@ -1113,7 +1117,7 @@ def lock_cam_tsf(cam, lock_it=True):
 def set_rotate_order(transform, ro):
     if isinstance(ro,(float,int)):
         ro = int(ro)
-    elif isinstance(ro,(str,unicode)):
+    elif isinstance(ro, string_types):
         ro = dict(xyz=0, yzx=1, zxy=2,xzy=3,yxz=4,zyx=5)[ro]
     transform.ro.set(ro)
 
