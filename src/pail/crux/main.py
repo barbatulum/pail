@@ -3,6 +3,15 @@ from six import string_types
 import maya.api.OpenMaya as om2
 
 
+def is_attribute_settable(simple=False):
+    """
+    Verify is the attribute is settalbe, locked or connected, locked/animated by reference, expression, etc.
+    if preferences are not set to be editalbe in the preference, cmds.getAttr(settable=1) will return True
+    node in the reference that is locked can be unlocked even if it's referenced into the scene.
+    """
+
+
+
 def get_selection():
     """ API get selection """
     sel_list = om2.MGlobal.getActiveSelectionList()
