@@ -3,7 +3,7 @@ import types
 from typing import Iterable, Optional, Self
 from maya import cmds
 from . import _log
-
+from . import constants as consts
 
 _logger = _log.get_logger(__name__)
 
@@ -13,15 +13,15 @@ class NullContext(object):
     Do nothing.
     """
 
-    def __enter__(self) -> None:
+    def __enter__(self):
         pass
 
     def __exit__(
-            self,
-            exc_type: Optional[type],
-            exc_value: Optional[BaseException],
-            exc_traceback: Optional[types.TracebackType],
-    ) -> None:
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[types.TracebackType],
+    ):
         pass
 
 
@@ -31,12 +31,12 @@ class LockContext(object):
     """
 
     def __init__(
-            self,
-            items: Iterable,
-            lock: bool = False,
-            bail_out_on_fail: bool = True,
-            unlock_referenced: bool = True,
-    ) -> None:
+        self,
+        items: Iterable,
+        lock: bool = False,
+        bail_out_on_fail: bool = True,
+        unlock_referenced: bool = True,
+    ):
         self.lock = lock
         self.bail_out_on_fail = bail_out_on_fail
         self.unlock_referenced = unlock_referenced
@@ -53,7 +53,7 @@ class LockContext(object):
         objects = self.attributes + self.nodes
         if any(cmds.objExists(obj) for obj in objects):
             self.failed = True
-            _logger.error("Some of {0} do not exist.".format(objects))
+            _logger.error("Some of %s do not exist.", objects)
 
     def __enter__(self) -> bool:
         """
@@ -67,14 +67,15 @@ class LockContext(object):
             context_manager = NullContext()
         with context_manager:
             # Though lockNode/getAttr can take a list of nodes, we don't always
-            # need to process each node, # and lockNode is fast enough to do each
+            # need to process each node, # and lockNode is fast enough to do
+            # each
             # of them individually.
             for items, get_func, kwarg, set_func, state_list in zip(
-                    (self.nodes, self.attributes),
-                    ("lockNode", "getAttr"),
-                    ("query", "lock"),
-                    ("lockNode", "setAttr"),
-                    (self.processed_nodes, self.attribute_states),
+                (self.nodes, self.attributes),
+                ("lockNode", "getAttr"),
+                ("query", "lock"),
+                ("lockNode", "setAttr"),
+                (self.processed_nodes, self.attribute_states),
             ):
                 for item in items:
                     try:
@@ -86,10 +87,9 @@ class LockContext(object):
                     except RuntimeError as err:
                         self.failed = True
                         _logger.error(
-                            "Failed on processing {0}, {1}".format(
-                                item,
-                                err,
-                            )
+                            "Failed on processing %s, %s",
+                            item,
+                            err,
                         )
                 if self.failed and self.bail_out_on_fail:
                     return False
@@ -118,7 +118,7 @@ class ReferenceLockContext(object):
 
     def __init__(
         self, enable: bool = True
-    ) -> None:
+    ):
         """
         Initialize the instance attributes with the provided arguments.
         """
@@ -134,11 +134,11 @@ class ReferenceLockContext(object):
         return self
 
     def __exit__(
-            self,
-            exc_type: Optional[type],
-            exc_value: Optional[BaseException],
-            exc_traceback: Optional[types.TracebackType],
-    ) -> None:
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[types.TracebackType],
+    ):
         """
         Restores the state.
         """
@@ -150,9 +150,89 @@ def enable_reference_lock(function):
     """
     Enable modifying lock states of referenced attributes.
     """
+
     @functools.wraps(function)
     def wrapped_function(*args, **kwargs):
         with ReferenceLockContext():
             return function(*args, **kwargs)
 
     return wrapped_function
+
+
+class RedrawContext(object):
+    """
+    Enable or disable redraw state, and restore it on exiting.
+    """
+
+    def __init__(self, enter_state: bool = False, exit_state: bool = True):
+        """
+        Initialize the instance attributes with the provided arguments.
+        """
+        self.enter_state = not enter_state
+        self.exit_state = not exit_state
+
+    def __enter__(self):
+        """
+        Set the enter state.
+        """
+        cmds.refresh(suspend=self.enter_state)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[types.TracebackType],
+    ):
+        """
+        Set the exit state.
+        """
+        cmds.refresh(suspend=self.exit_state)
+
+
+class NamespaceContext(object):
+    """
+    Enter the given namespace.
+    """
+
+    def __init__(self, namespace=":"):
+        self.namespace = namespace
+        self.init_namespace = None
+
+    def __enter__(self) -> Self:
+        self.init_namespace = cmds.namespaceInfo(currentNamespace=True)
+
+        cmds.namespace(set=":")
+        if self.namespace and self.namespace != ":":
+            namespace_exists = cmds.namespace(ex=self.namespace)
+            name_occupied = cmds.objExists(self.namespace)
+
+            if name_occupied and not namespace_exists:
+                raise ValueError(
+                    "Name '{0}' is occupied but not a namespace.".format(
+                        self.namespace
+                    )
+                )
+
+            if not namespace_exists:
+                cmds.namespace(addNamespace=self.namespace)
+                cmds.namespace(set=self.namespace)
+
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[types.TracebackType],
+    ):
+        try:
+            cmds.namespace(set=self.init_namespace)
+        except RuntimeError as err:
+            if str(err).startswith(consts.Om2Error.NO_MATCHING_NAMESPACE):
+                cmds.namespace(set=":")
+                _logger.critical(
+                    "Initial namespace '%s' is gone.",
+                    self.init_namespace,
+                )
+            raise
