@@ -142,6 +142,14 @@ def transform_to_local(
         translate = new_fn.translation(
             om2.MSpace.kTransform
         )  # om2.MSpace.kWorld
-        rotate = new_fn.rotation(asQuaternion=False)
+        rotate = new_fn.rotation(asQuaternion=False) # radians
         # ? scale = new_fn.scale(om2.MSpace.kTransform)
         yield translate, rotate
+
+
+cmds.createNode('animCurveTL', name='translate')
+cmds.createNode('animCurveTA', name='rotate')
+
+for cnt in range(100):
+    cmds.setKeyframe("animcurve_name", value=cnt, time=cnt)
+

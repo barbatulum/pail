@@ -1,7 +1,10 @@
 import functools
 import types
 from typing import Iterable, Optional, Self
+
 from maya import cmds
+import maya.api.OpenMaya as om2
+
 from . import _log
 from . import constants as consts
 
@@ -236,3 +239,38 @@ class NamespaceContext(object):
                     self.init_namespace,
                 )
             raise
+
+
+class SelectContext(object):
+    """
+    Clear selection, select given nodes, and restore selection on exiting.
+    """
+
+    def __init__(self, nodes=None):
+        """
+        Initialize the instance attributes with the provided arguments.
+        """
+        self.selected = []
+        self.selecting_nodes = nodes if nodes else None
+
+    def __enter__(self):
+        """
+        Store selection, and then select given nodes or clear selection.
+        """
+        self.selected = om2.MGlobal.getActiveSelectionList()
+
+        if self.selecting_nodes is not None:
+            cmds.select(self.selecting_nodes, replace=True)
+        else:
+            cmds.select(cl=True)
+
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[types.TracebackType],
+    ):
+        """Restore selection."""
+        om2.MGlobal.setActiveSelectionList(self.selected)
