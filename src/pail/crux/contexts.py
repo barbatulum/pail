@@ -1,6 +1,7 @@
 import functools
 import types
-from typing import Iterable, Optional, Self
+from typing import Iterable, Optional
+from typing_extensions import Self
 
 from maya import cmds
 import maya.api.OpenMaya as om2

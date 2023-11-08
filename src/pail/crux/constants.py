@@ -20,3 +20,4 @@ def get_rotate_order(rotate_order, data_source=om2.MTransformationMatrix):
 class Om2Error(object):
     OBJECT_EXISTENT = "(kInvalidParameter): Object does not exist"
     NO_MATCHING_NAMESPACE = "No namespace matches name"
+    NOT_FROM_REFERENCE = "not from a referenced file"

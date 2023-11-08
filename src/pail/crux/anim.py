@@ -49,7 +49,7 @@ def get_range_slider_range(animation: bool = True) -> Tuple[float, float]:
     )
 
 
-def clear_selected_animation(nodes: List[str] = None):
+def clear_animation(nodes: List[str] = None):
     """
     Clear animation curves of the give nodes or those of the selected nodes.
     """
@@ -67,7 +67,7 @@ def plot_frames(
     end: Union[float, int],
     sub_steps: Union[None, int] = None,
     step_size: Union[float, int] = 1,
-    include: bool = False
+    include: bool = True
 ) -> List[float]:
     # todo: support frame relative samples
     int_start = int(math.floor(start))

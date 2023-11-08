@@ -903,3 +903,8 @@ def show():
 
 if __name__ == '__main__':
     show()
+
+"""
+cmds.addAttr('camShape', longName='notes', dt="string")
+cmds.setAttr('camShape.notes', 'aaac',type='string')
+"""
