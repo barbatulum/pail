@@ -13,22 +13,7 @@ def set_show_hide(panel, obj_type, state):
     if not panel:
         warning('You have to ACTIVE a panel')
         return
-    if obj_type == 'nurbsCurves':
-        cmds.modelEditor(panel, e=1, nurbsCurves=state)
-    if obj_type == 'polymeshes':
-        cmds.modelEditor(panel, e=1, polymeshes=state)
-    if obj_type == 'locators':
-        cmds.modelEditor(panel, e=1, locators=state)
-    if obj_type == 'camera':
-        cmds.modelEditor(panel, e=1, cameras=state)
-    if obj_type == 'selectionHiliteDisplay':
-        cmds.modelEditor(panel, e=1, selectionHiliteDisplay=state)
-    if obj_type == 'wireframeOnShaded':
-        cmds.modelEditor(panel, e=1, wireframeOnShaded=state)
-    if obj_type == 'imagePlane':
-        cmds.modelEditor(panel, e=1, imagePlane=state)
-    if obj_type == 'gpuCache':
-        cmds.modelEditor(panel, e=1, pluginObjects=('gpuCacheDisplayFilter', state))
+    cmds.modelEditor(panel, edit=True, **{obj_type: state})
 
 
 def get_maya_ui_long_name(qt_widget):

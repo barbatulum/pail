@@ -1,10 +1,12 @@
 import functools
 import types
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union, Callable
 from typing_extensions import Self
 
 from maya import cmds
 import maya.api.OpenMaya as om2
+
+from PySide2 import QtCore
 
 from . import _log
 from . import constants as consts
@@ -150,19 +152,6 @@ class ReferenceLockContext(object):
         return
 
 
-def enable_reference_lock(function):
-    """
-    Enable modifying lock states of referenced attributes.
-    """
-
-    @functools.wraps(function)
-    def wrapped_function(*args, **kwargs):
-        with ReferenceLockContext():
-            return function(*args, **kwargs)
-
-    return wrapped_function
-
-
 class RedrawContext(object):
     """
     Enable or disable redraw state, and restore it on exiting.
@@ -275,3 +264,98 @@ class SelectContext(object):
     ):
         """Restore selection."""
         om2.MGlobal.setActiveSelectionList(self.selected)
+
+
+class QtSignalContext(object):
+    """
+    Block or de-block signal of the given qt widgets.
+    """
+
+    def __init__(self, widgets: Iterable, state: Union[bool, str]="toggle"):
+        """
+        Initialize the instance attributes with the provided arguments.
+        """
+        self.state = state
+        self.widgets = widgets
+        self.restore_states = None
+
+    def __enter__(self):
+        """
+        Set the enter state.
+        """
+        for widget in self.widgets:
+            if not hasattr(widget, "blockSignals"):
+                continue
+            if self.state == "toggle":
+                value = not widget.signalsBlocked()
+            else:
+                value = self.state
+
+            widget.blockSignals(self.state)
+            self.restore_states[widget] = not value
+        return self
+
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[types.TracebackType],
+    ):
+        """
+        Set the exit state.
+        """
+        for widget, state in self.restore_states.items():
+            widget.blockSignals(state)
+
+
+def enable_reference_lock(function):
+    """
+    Enable modifying lock states of referenced attributes.
+    """
+
+    @functools.wraps(function)
+    def wrapped_function(*args, **kwargs):
+        with ReferenceLockContext():
+            return function(*args, **kwargs)
+
+    return wrapped_function
+
+
+def block_qt_signals(func):
+    def wrapper(*args, **kwargs):
+        if args and isinstance(args[0], QtCore.QObject):
+            obj = args[0]
+        else:
+            raise ValueError(
+                "The first argument should be a QObject instance."
+            )
+        original_state = obj.signalsBlocked()
+
+        obj.blockSignals(True)
+
+        try:
+            result = func(*args, **kwargs)
+        finally:
+            obj.blockSignals(original_state)
+
+        return result
+
+    return wrapper
+
+
+def undo_dec(func):
+    """
+    A decorator that will make commands undoable in maya.
+    """
+    def _deco(*args, **kwargs):
+        cmds.undoInfo(openChunk=True)
+        func_return = None
+        try:
+            func_return = func(*args, **kwargs)
+        except:
+            print(sys.exc_info()[1])
+        finally:
+            cmds.undoInfo(closeChunk=True)
+            return func_return
+
+    return _deco

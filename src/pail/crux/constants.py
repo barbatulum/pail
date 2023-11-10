@@ -1,6 +1,8 @@
 import maya.api.OpenMaya as om2
 from six import string_types
 
+RotateOrderStr = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
+
 class CmdsRotateOrder:
     kXYZ = om2.MEulerRotation.kXYZ
     kYZX = om2.MEulerRotation.kYZX
