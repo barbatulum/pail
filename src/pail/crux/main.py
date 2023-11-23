@@ -24,7 +24,7 @@ def get_mobject(node):
     elif isinstance(node, om2.MObjectArray):
         return [get_mobject(node[c]) for c in range(len(node))]
     else:
-        raise TypeError(node)
+        raise TypeError(node, type(node))
 
 
 def convert_node(node, return_type):
@@ -58,7 +58,7 @@ def get_parent(parent, return_type=om2.MObject):
     return convert_node(parent_node, return_type)
 
 
-def get_shapes(node, siblings=False):
+def get_shapes(node, siblings=False, return_type=om2.MObject):
     mobject = convert_node(node, om2.MObject)
     is_transform = mobject.hasFn(om2.MFn.kTransform)
     if not siblings and not is_transform:
@@ -75,8 +75,10 @@ def get_shapes(node, siblings=False):
     dag_path = om2.MDagPath.getAPathTo(transform)
     child_count = dag_path.numberOfShapesDirectlyBelow()
     shapes = [
-        dag_path.extendToShape(cnt) for cnt in
-        range(child_count)
+        convert_node(
+            dag_path.extendToShape(cnt), return_type=return_type
+        )
+        for cnt in range(child_count)
     ]
 
     return shapes
@@ -89,9 +91,11 @@ def get_selection():
 
 def ls(node_type=om2.MFn.kCamera, return_type=om2.MObject):
     nodes = []
-    dag_iter = om2.MItDag(om2.MItDag.kDepthFirst, node_type)
+    # dag_iter = om2.MItDag(om2.MItDag.kDepthFirst, node_type)
+    dag_iter = om2.MItDependencyNodes(node_type)
     while not dag_iter.isDone():
-        obj = dag_iter.currentItem()
+        # obj = dag_iter.currentItem()
+        obj = dag_iter.thisNode()
         nodes.append(obj)
         dag_iter.next()
 

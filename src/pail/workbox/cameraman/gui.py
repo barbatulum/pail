@@ -12,7 +12,10 @@ from ...crux import _log
 from ...crux import contexts
 from ...crux import gui as maya_gui
 
+
 _logger = _log.get_logger(__name__)
+
+
 class QSingleton(type(QtCore.QObject), type):
     # https://github.com/davidlatwe/sweet/blob/main/src/sweet/gui/models.py#L22
     _instances = {}
@@ -36,8 +39,7 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
         self.central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(self.central_widget)
         self.central_vertical_layout = QtWidgets.QVBoxLayout(
-            self.central_widget
-            )
+            self.central_widget            )
 
         # top_layout
         self.top_layout = QtWidgets.QVBoxLayout()
@@ -59,20 +61,43 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
         self.mid_layout.setStretch(1, 2)
 
         # Mid layout -> left panel -> list UIs
-        self.list_ui_commands_qhl = QtWidgets.QHBoxLayout()
+        # todo: only show refresh_qpb button when the mode is set to not manual update
         self.refresh_qpb = QtWidgets.QPushButton(
             "Refresh", self.central_widget
             )
-        self.qlist_order_pqb = QtWidgets.QPushButton(
-            "Camera first", self.central_widget
-            )
-        self.list_ui_commands_qhl.addWidget(self.refresh_qpb)
-        self.list_ui_commands_qhl.addWidget(self.qlist_order_pqb)
-        self.list_ui_qvl.addLayout(self.list_ui_commands_qhl)
+        self.list_ui_qvl.addWidget(self.refresh_qpb)
 
         self.camera_list = ListWidget(self.central_widget)
         self.camera_list.setObjectName(consts.ObjectName.CameraList)
         self.list_ui_qvl.addWidget(self.camera_list)
+
+        fixed_size = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed
+        )
+        # self.toggle_list_order_qpb = QtWidgets.QPushButton(
+        #     "⭮", self.central_widget
+        # )
+        self.link_list_display_qpb = QtWidgets.QPushButton(
+            "🡹🡻", self.central_widget
+        )
+
+        self.link_list_selection_qpb = QtWidgets.QPushButton(
+            "🔗", self.central_widget
+        )
+        self.link_list_selection_qpb.setCheckable(True)
+        # ⭮⬇⬆ 🡑 🡓 🡙 ⇧ ⇩ ⇳  ⤒ ⤓ ↨⟰ ⟱ ⇡ ⇣ ⮸ 🠉 🠋🠝 🠟 🡩 🡫🡹 🡻⮝ ⮟🡅 🡇
+        # ▲  △╳X✖🗙🞮🞭🞬🞫🗙✘❌⏹⧅⧣⍂⍯⎕⏹⬜
+        self.list_option_qhl = QtWidgets.QHBoxLayout()
+        for btn in (
+            self.link_list_selection_qpb,
+            # self.toggle_list_order_qpb,
+            self.link_list_display_qpb,
+        ):
+            self.list_option_qhl.addWidget(btn)
+
+        self.list_ui_qvl.addLayout(self.list_option_qhl)
+        self.list_option_qhl.setContentsMargins(50, 0, 50, 0)
+
         self.image_plane_list = ListWidget(self.central_widget)
         self.image_plane_list.setObjectName(consts.ObjectName.ImagePlaneList)
         self.list_ui_qvl.addWidget(self.image_plane_list)
@@ -157,6 +182,103 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
 
         self.make_pusher(self.main_tab_qvl)
         self.make_pusher(self.config_tab_qvl)
+        for list_widget in self.camera_list, self.image_plane_list:
+            list_widget.itemSelectionChanged.connect(
+                self.on_lists_selection_change
+            )
+        # self.toggle_list_order_qpb.clicked.connect(self.switch_list)
+        self.link_list_display_qpb.clicked.connect(self.switch_display_update_mode)
+
+        self.populate_primary_list()
+        self.populate_secondary_list()
+
+
+    def display_updating_mode(self):
+        return {
+            "🡻": 1, "🡹🡻": 2, "⬜": 0
+        }[self.link_list_display_qpb.text()]
+
+    def is_selection_linked(self):
+        return self.link_list_selection_qpb.isChecked()
+
+
+    def switch_display_update_mode(self):
+        self.link_list_display_qpb.setText(
+            {
+                "🡻": "🡹🡻", "🡹🡻": "⬜", "⬜":"🡻"
+            }[self.link_list_display_qpb.text()]
+        )
+        mode = self.display_updating_mode()
+        self.link_list_selection_qpb.setStyleSheet("")
+        if mode == 0:
+            self.populate_primary_list()
+            self.populate_secondary_list()
+            self.link_list_selection_qpb.setChecked(False)
+        elif mode == 2:
+            self.link_list_selection_qpb.setChecked(True)
+            self.link_list_selection_qpb.setStyleSheet(
+                "QPushButton { background-color: black}"
+            )
+        else:
+            self.link_list_selection_qpb.setChecked(True)
+
+        self.link_list_selection_qpb.setEnabled(mode == 1)
+
+        return mode
+
+    def is_selection_reverse_updating(self):
+        return self.link_list_display_qpb.text() == "🡹🡻"
+
+
+    def switch_selection_update_mode(self):
+        self.link_list_display_qpb.setText(
+            {"🡻": "🡹🡻", "🡹🡻": "🡻"}[self.link_list_display_qpb.text()]
+        )
+        return self.reverse_update()
+
+
+    def get_primary_list_idx(self):
+        """
+        Return what the top list is by OpenMaya constants.
+        """
+        cam_idx = self.list_ui_qvl.indexOf(self.camera_list)
+        ip_idx = self.list_ui_qvl.indexOf(self.image_plane_list)
+        idx = om2.MFn.kCamera if cam_idx < ip_idx else om2.MFn.kImagePlane
+        return idx
+
+    @contexts.block_qt_signals
+    def switch_list(self):
+        orig_selection = self.get_current_selections()
+        primary_list_idx = self.get_primary_list_idx()
+        widgets = [
+            self.camera_list,
+            self.image_plane_list,
+        ]
+        self.list_ui_qvl.removeItem(self.list_option_qhl)
+        if primary_list_idx == om2.MFn.kCamera:
+            widgets.reverse()
+        for widget in widgets:
+
+            self.list_ui_qvl.addWidget(widget)
+        self.list_ui_qvl.insertLayout(2, self.list_option_qhl)
+
+        self.populate_primary_list()
+        self.populate_secondary_list()
+        _, main_node_type, ordered_lists = self.get_active_info()
+        for list_widget in ordered_lists:
+            for item in list_widget.list_items():
+                for name, handles in orig_selection[main_node_type].items():
+                    if not handles[0].isValid() or not handles[1].isValid():
+                        continue
+                    if handles[0] == item.transform_handle:
+                        item.setSelected(True)
+
+        if orig_selection[main_node_type]:
+            for item in ordered_lists[0].list_items():
+                if item.text() in orig_selection[main_node_type]:
+                    item.setSelected(True)
+                    break
+
 
     @staticmethod
     def make_pusher(layout):
@@ -184,24 +306,30 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
                 attribute.setEnabled(lock)
 
     def warning(
-        self, message, lasts=3000, pos="topCenter", formation="<hl>{}</hl>"
+        self,
+        message,
+        lasts=3000,
+        in_view_message=True,
+        pos="topCenter",
+        formation="<hl>{}</hl>"
     ):
         """
         Show a warning message on the status bar and in the viewport.
         """
-        cmds.inViewMessage(
-            smg=formation.format(message), fade=True, pos=pos
-            )
+        if in_view_message:
+            cmds.inViewMessage(
+                smg=formation.format(message), fade=True, pos=pos
+                )
 
         self.status_bar.showMessage(message, lasts=lasts)
 
-    def get_widget_attribute_mapping(self, prefix=consts.Main.Camera):
+    def get_widget_attribute_mapping(self, prefix=om2.MFn.kCamera):
         """
         Return a mapping of the widget and the maya attribute name.
         """
         mapping = {}
         for widget_name in dir(self):
-            if not widget_name.startswith(prefix):
+            if not widget_name.startswith(str(prefix)):
                 continue
             maya_attribute = consts.AttributeMapping.get(widget_name)
             if maya_attribute is None:
@@ -214,15 +342,15 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
         return mapping
 
     # todo: WIP
-    def connect_attributes(self, key=consts.Main.Camera):
+    def connect_attributes(self, key=om2.MFn.kCamera):
         """
         Connect the widget signal to set the maya attributes.
         """
         widget_attribute_mapping = self.get_widget_attribute_mapping(key)
-        if key == consts.Main.Camera:
-            object_cmd = self.getcam
+        if key == om2.MFn.kCamera:
+            object_cmd = self.get_cam
         else:
-            object_cmd = self.getimageplane
+            object_cmd = self.get_imageplane
 
         for widget, attribute in widget_attribute_mapping.items():
             signal = consts.QtAttributeSignal.get(type(widget))
@@ -233,52 +361,190 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
             signal.connect(
                 lambda x: cmds.setAttr(object_cmd() + "." + attribute)
             )
-    def get_selection_names(self, scene=True, gui=True):
+    def get_current_selections(self):
         """
         Get the selection of GUI lists, and/or the actual camera and
         image plane scene nodes.
         """
         selection = {}
-        if gui:
-            for list_widget in (self.camera_list, self.image_plane_list):
-                selection.setdefault("gui", []).extend(
-                    list_widget.list_selected_text().values())
-        if scene:
-            selection["scene"] = crux.convert_nodes(
-                crux.get_selection(), "partialPath"
-            )
+        for kind, list_widget in zip(
+            (om2.MFn.kCamera, om2.MFn.kImagePlane),
+            (self.camera_list, self.image_plane_list),
+        ):
+            selection[kind] = {
+                item.text(): (item.transform_handle, item.shape_handle)
+                for item in list_widget.selectedItems()
+            }
         return selection
 
+
+
+    # def get_list_selection(self, selection=None):
+    #     """
+    #     Get the selection of GUI lists, and/or the actual camera and
+    #     image plane scene nodes.
+    #     """
+    #     gui_selection = list_widget.list_selected_text()
+    #     for list_widget in (self.camera_list, self.image_plane_list):
+    #         selection.setdefault("gui", []).extend(
+    #             list_widget.list_selected_text().values()
+    #         )
+    #     return selection
+    def on_list_selection_change(self):
+        """
+        Update Cam/IP list selection on the other one changes.
+        e.g. On selecting image plane, the corresponding camera in the cam list
+        should be selected.
+        """
+    def get_active_info(self):
+        main_node_type = self.get_primary_list_idx()
+        cam_first = main_node_type == om2.MFn.kCamera
+        ordered_lists = (self.camera_list, self.image_plane_list)
+        if not cam_first:
+            ordered_lists = list(reversed(ordered_lists))
+
+        return cam_first, main_node_type, ordered_lists
+
+    def on_lists_selection_change(self):
+        sender = self.sender()
+        sender_selected = sender.selectedItems()
+        selected_handles = [item.transform_handle for item in sender_selected]
+        cam_first, main_node_type, ordered_lists = self.get_active_info()
+        reverse_updating = self.display_updating_mode()
+        selection_linked = self.is_selection_linked()
+        if reverse_updating == 2:
+            context_manager = contexts.NullContext
+        else:
+            context_manager = contexts.QtSignalContext
+
+        if sender == ordered_lists[0] and reverse_updating != 0:
+            self.populate_secondary_list()
+        elif selection_linked:
+            primary_list_items = ordered_lists[0].list_items()
+            selecting = []
+            for item in sender_selected:
+                camera_goodies = get_connected_camera_goodies(
+                    item.transform_handle
+                )
+                _, (camera, camera_shape), image_planes, = camera_goodies
+                if cam_first and camera is not None:
+                    with context_manager([ordered_lists[0]], block=True):
+                        for cam_item in primary_list_items:
+                            if cam_item.transform_handle.object() == camera:
+                                selecting.append(cam_item)
+
+            with context_manager(ordered_lists, block=True):
+                for cam_item in primary_list_items:
+                    select = cam_item in selecting
+                    cam_item.setSelected(select)
+
+            # with contexts.QtSignalContext(ordered_lists, block=True):
+                if reverse_updating:
+                    for item in ordered_lists[1].list_items():
+                        for handle in selected_handles:
+                            if item.transform_handle == handle:
+                                item.setSelected(True)
+                                break
+
+
+
+
+
+
+
+    def populate_secondary_list(self):
+        cam_first, main_node_type, ordered_lists = self.get_active_info()
+        ordered_lists[1].clear()
+        selected_items = ordered_lists[0].selectedItems()
+        all_items = ordered_lists[0].list_items()
+        active_items = (
+            ordered_lists[0].selectedItems()
+            or
+            ordered_lists[0].list_items()
+        )
+        transforms = []
+        if selected_items:
+            for item in selected_items:
+                # todo: if not item.transform_handle.isValid(), repopulate and reselect matching name.
+                _, (camera, camera_shape), image_planes = get_connected_camera_goodies(
+                    item.transform_handle
+                )
+                # standalone image planes return None for camera
+                if camera is None:
+                    continue
+                if main_node_type == om2.MFn.kImagePlane:
+                    transforms.append(camera)
+                else:
+                    transforms.extend([tsf for tsf, _ in image_planes])
+        else:
+            if main_node_type == om2.MFn.kCamera:
+                node_type = om2.MFn.kImagePlane
+            else:
+                node_type = om2.MFn.kCamera
+            transforms.extend(
+                [shape for shape in crux.ls(node_type)]
+            )
+        # todo: if selected cam only has one image plane, select it
+        # todo: populate non-attached image planes
+        new_items = ordered_lists[1].add(transforms)
+        single_select = len(selected_items) == 1
+        if single_select and len(new_items) == 1:
+            new_items[0].setSelected(True)
+
+
+    def refresh_and_restore_scene_select(self, restore_scene_selection=True):
+        added_items = self.populate_primary_list()
+        names = [
+            [
+                crux.convert_node(
+                    getattr(item, attr), "partialPath"
+                )
+                for item in added_items
+            ]
+            for attr in ("transform_handle", "shape_handle")
+        ]
+        cam_first, main_node_type, ordered_lists = self.get_active_info()
+        if restore_scene_selection:
+            scene_selection = crux.convert_nodes(
+                crux.get_selection(), "partialPath"
+            )
+            # todo: if selected is IP, update ip and cam GUI selection accordingly
+            for node_name in reversed(scene_selection):
+                for names_ in names:
+                    try:
+                        ids = names_.index(node_name)
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    return
+                current_item = added_items[ids]
+                if current_item.text() == node_name:
+                    current_item.setSelected(True)
+
+            for item in ordered_lists[-1].list_items():
+                if item.text() in scene_selection:
+                    item.setSelected(True)
+
     @contexts.block_qt_signals
-    def populate_camera_goodies(self, align_scene_selection=True):
+    def populate_primary_list(self):
         """
         Populate scene camera and image plane nodes to the list widgets.
         """
-        selection = self.get_selection_names(scene=align_scene_selection)
-        for node_type, list_widget in zip(
-            (om2.MFn.kCamera, om2.MFn.kImagePlane),
-            (self.camera_list,self.image_plane_list),
-        ):
-            # Repopulate items
+        # with contexts.QtSignalContext((self.camera_list, self.image_plane_list)):
+        for list_widget in (self.camera_list, self.image_plane_list):
             list_widget.clear()
-            scene_nodes = crux.ls(node_type=node_type)
-            for node in scene_nodes:
-                list_widget.add(node)
-
-            # Restore selection
-            list_items = list_widget.list_items()
-            for item in list_items:
-                item_text = item.text()
-                if align_scene_selection:
-                    if item_text in selection.get("scene", []):
-                        item.setSelected(True)
-                elif item_text in selection["gui"]:
-                    item.setSelected(True)
+        _, main_node_type, ordered_lists = self.get_active_info()
+        add_items = ordered_lists[0].add(
+            sorted(
+                crux.ls(node_type=main_node_type, return_type="partialPath")
+            )
+        )
+        return add_items
 
     @contexts.block_qt_signals
     def align_gui_widgets_to_scene_node(
         self,
-        mode=consts.Main.Camera,
         camera=None,
         image_plane=None,
     ):
@@ -301,7 +567,7 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
 
         self.blockSignals(True)
         for prefix, scene_node in zip(
-            (consts.Main.Camera, consts.Main.ImagePlane),
+            (om2.MFn.kCamera, om2.MFn.kImagePlane),
             (camera, image_plane)
         ):
             widget_attribute_mapping = self.get_widget_attribute_mapping(prefix)
@@ -333,11 +599,6 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
                     self.warning(msg)
 
 
-
-    # def align_camera_attributes(self):
-    # def align_gui_states(self):
-
-
 class ListWidget(QtWidgets.QListWidget):
     """
     ListWidget for camera related items with some custom methods.
@@ -345,33 +606,73 @@ class ListWidget(QtWidgets.QListWidget):
     def __init__(self, parent):
         super(ListWidget, self).__init__(parent)
         self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+    #
+    # def clear(self):
+    #     with contexts.QtSignalContext([self]):
+    #         super().clear()
 
-    def add(self, node):
+    def add(self, nodes):
         """ Shortcut to add QtWidgets"""
-        handle = crux.convert_node(node, om2.MObjectHandle)
-        partial_path = crux.convert_node(node, "partialPath")
-        self.addItem(partial_path)
-        last = self.item(self.count() - 1)
-        last.handle = handle
-        return last
+        items = []
+        for node in nodes:
+            mobj = crux.convert_node(node, om2.MObject)
+            camera_goodies = get_connected_camera_goodies(mobj)
+            (node_type, transform, shape), _, _ = camera_goodies
+            partial_path = crux.convert_node(transform, "partialPath")
+            if node_type == om2.MFn.kImagePlane:
+                partial_path = partial_path.split("->")[-1]
+            self.addItem(partial_path)
+            item = self.item(self.count() - 1)
+            item.node_type = node_type
+            item.transform_handle, item.shape_handle = (
+                crux.convert_node(mobj, om2.MObjectHandle)
+                for mobj in (transform, shape)
+            )
+            items.append(item)
+
+        return items
 
     def list_items(self):
         return [self.item(cnt) for cnt in range(self.count())]
 
-    def list_selected_text(self):
-        selected_widget = self.selectedItems()
-        texts = {}
-        for widget in selected_widget:
-            if hasattr(widget, "handle"):
-                if widget.handle.isValid():
-                    texts[widget] = crux.convert_node(
-                        widget.handle, "partialPath"
-                        )
-            else:
-                texts[widget] = widget.text()
-        return texts
+    # def list_selected_text(self):
+    #     selected_widget = self.selectedItems()
+    #     texts = {}
+    #     for widget in selected_widget:
+    #         if hasattr(widget, "handle"):
+    #             if widget.transform_handle.isValid():
+    #                 texts[widget] = crux.convert_node(
+    #                     widget.transform_handle, "partialPath"
+    #                 )
+    #         else:
+    #             texts[widget] = widget.text()
+    #     return texts
 
-def get_connected_camera_goodies(mobject):
+def list_scene_camera_goodies():
+    camera_mobjects = crux.ls(
+        node_type=om2.MFn.kCamera, return_type=om2.MObject
+    )
+    scene_camera_goodies = {
+        crux.convert_node(
+            cam, "partialPath"
+        ): get_connected_camera_goodies(cam)
+        for cam in camera_mobjects
+    }
+
+    image_planes = {
+        crux.convert_node(tsf, "partialPath"): (
+            (om2.MFn.kImagePlane, tsf, shape),
+            cam_info,
+            image_planes,
+        )
+        for _, cam_info, image_planes in scene_camera_goodies.values()
+        for tsf, shape in image_planes
+    }
+    scene_camera_goodies.update(image_planes)
+    return scene_camera_goodies
+
+def get_connected_camera_goodies(node):
+    mobject = crux.convert_node(node, om2.MObject)
     source_transform = None
     if mobject.hasFn(om2.MFn.kTransform):
         source_transform = mobject
@@ -394,18 +695,16 @@ def get_connected_camera_goodies(mobject):
         if connections:
             camera, camera_shape = [
                 (crux.get_parent(plug.node()), plug.node())
-                for src, dst_plugs in connections.values()[0]
-                for plug in dst_plugs
+                for plug in list(connections.values())[0][1]
             ][0]
         else:
             camera, camera_shape = None, None
 
     else:
-        raise RuntimeError(
-            "{0} is not a camera goody".format(
-                crux.convert_node(mobject, "partialPath")
-            )
+        msg = "{0} is not a camera goody".format(
+            crux.convert_node(mobject, "partialPath")
         )
+        raise RuntimeError(msg)
 
     if source_transform is None:
         source_transform = crux.get_parent(shapes[0])
@@ -416,7 +715,7 @@ def get_connected_camera_goodies(mobject):
             camera_shape, "imagePlane", source=True, destination=False
         )
         image_planes = [
-            (crux.get_parent(dst), dst)
+            (crux.get_parent(dst.node()), dst.node())
             for src_plug, dst_plugs in connections.values()
             for dst in dst_plugs
         ]
@@ -452,45 +751,47 @@ def get_camera_goodies_on_selection():
     else:
         return False
     transform = shape.transform()
-    update_ui(transform, shape, widget_name=widget_name)
+    # update_ui(transform, shape, widget_name=widget_name)
 
 
-def update_ui(transform, shape, widget_name=consts.ObjectName.CameraList):
-    """ update the UI by selection changed callback """
-    # index = {'camera': 0, 'image_plane': 1}[mode]
-    gui = CameramanGUI()
-    camera, camera_shape, image_plane, image_plane_shape = (None,) * 4
-    if widget_name == consts.ObjectName.CameraList:
-        camera = transform
-        camera_shape = shape
-    else:
-        image_plane = transform
-        image_plane_shape = shape
-
-    list_widget = getattr(gui, widget_name)
-    list_widget.setFocus()
-
-    get_connected_cmd = {
-        consts.ObjectName.CameraList: get_connected_cam,
-        consts.ObjectName.ImagePlaneList: get_connected_imagePlane,
-    }[widget_name]
-
-
-    fp = main.mobj2(node, 'fullPath')
-    if fp in full_path:
-        updating_listWidget.set_selected(
-            updating_listWidget.item(full_path.index(fp))
-            )
-    else:
-        connected = get_connected_cmd(node)
-        if connected:
-            connected = connected[0]
-        connected_fp = main.mobj2(connected, 'fullPath')
-        all_fp = listWidget[1 - index].list_items()[3]
-        if not connected_fp in all_fp:
-            return
-        idx = all_fp.index(connected_fp)
-        listWidget[1 - index].set_selected(listWidget[1 - index].item(idx))
-        idx = updating_listWidget.list_items()[3].index(fp)
-        updating_listWidget.set_selected(updating_listWidget.item(idx))
-
+#
+#
+# def update_ui(transform, shape, widget_name=consts.ObjectName.CameraList):
+#     """ update the UI by selection changed callback """
+#     # index = {'camera': 0, 'image_plane': 1}[mode]
+#     gui = CameramanGUI()
+#     camera, camera_shape, image_plane, image_plane_shape = (None,) * 4
+#     if widget_name == consts.ObjectName.CameraList:
+#         camera = transform
+#         camera_shape = shape
+#     else:
+#         image_plane = transform
+#         image_plane_shape = shape
+#
+#     list_widget = getattr(gui, widget_name)
+#     list_widget.setFocus()
+#
+#     get_connected_cmd = {
+#         consts.ObjectName.CameraList: get_connected_cam,
+#         consts.ObjectName.ImagePlaneList: get_connected_imagePlane,
+#     }[widget_name]
+#
+#
+#     fp = main.mobj2(node, 'fullPath')
+#     if fp in full_path:
+#         updating_listWidget.set_selected(
+#             updating_listWidget.item(full_path.index(fp))
+#             )
+#     else:
+#         connected = get_connected_cmd(node)
+#         if connected:
+#             connected = connected[0]
+#         connected_fp = main.mobj2(connected, 'fullPath')
+#         all_fp = listWidget[1 - index].list_items()[3]
+#         if not connected_fp in all_fp:
+#             return
+#         idx = all_fp.index(connected_fp)
+#         listWidget[1 - index].set_selected(listWidget[1 - index].item(idx))
+#         idx = updating_listWidget.list_items()[3].index(fp)
+#         updating_listWidget.set_selected(updating_listWidget.item(idx))
+#

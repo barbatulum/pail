@@ -1,4 +1,5 @@
 import functools
+import sys
 import types
 from typing import Iterable, Optional, Union, Callable
 from typing_extensions import Self
@@ -19,6 +20,8 @@ class NullContext(object):
     Do nothing.
     """
 
+    def __init__(self, *args, **kwargs):
+        pass
     def __enter__(self):
         pass
 
@@ -271,13 +274,13 @@ class QtSignalContext(object):
     Block or de-block signal of the given qt widgets.
     """
 
-    def __init__(self, widgets: Iterable, state: Union[bool, str]="toggle"):
+    def __init__(self, widgets: Iterable, block: Union[bool, str]="toggle"):
         """
         Initialize the instance attributes with the provided arguments.
         """
-        self.state = state
+        self.block = block
         self.widgets = widgets
-        self.restore_states = None
+        self.restore_states = {}
 
     def __enter__(self):
         """
@@ -286,13 +289,10 @@ class QtSignalContext(object):
         for widget in self.widgets:
             if not hasattr(widget, "blockSignals"):
                 continue
-            if self.state == "toggle":
-                value = not widget.signalsBlocked()
-            else:
-                value = self.state
-
-            widget.blockSignals(self.state)
-            self.restore_states[widget] = not value
+            if self.block == "toggle":
+                self.block = not widget.signalsBlocked()
+            widget.blockSignals(self.block)
+            self.restore_states[widget] = not self.block
         return self
 
     def __exit__(
@@ -343,7 +343,7 @@ def block_qt_signals(func):
     return wrapper
 
 
-def undo_dec(func):
+def undo_chunk(func):
     """
     A decorator that will make commands undoable in maya.
     """

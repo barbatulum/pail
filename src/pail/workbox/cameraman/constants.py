@@ -1,3 +1,5 @@
+import maya.api.OpenMaya as om2
+
 from PySide2 import QtWidgets
 
 
@@ -66,16 +68,14 @@ class AttrEnumMapping:
         'Luminance': 4,
         'Alpha': 5,
     }
-class Main:
-    Camera = "_cameraman_camera_"
-    ImagePlane = "_cameraman_image_plane_"
+
 class ObjectName:
     ShowOptions = "show_options_"
     CameraList = "_cameraman_camera_list"
     ImagePlaneList = "_cameraman_image_plane_list"
 
     class Camera:
-        base = Main.Camera
+        base = str(om2.MFn.kCamera)
         group_box = "group_box"
         rotate_order = base + "rotate_order"
         far_clip_plane = base + "far_clip_plane"
@@ -83,7 +83,7 @@ class ObjectName:
 
 
     class ImagePlane:
-        base = Main.ImagePlane
+        base = str(om2.MFn.kImagePlane)
         attributes_group_box = "attributes_group_box"
         cmds_group_box = "cmds_group_box"
         alpha_gain = base + "alpha_gain"
@@ -126,6 +126,11 @@ class ObjectName:
         group_box = "group_box"
         disable_update_callback = "disable_update_callback"
         align_gui_to_scene = "align_gui_to_scene"
+        font_size = "font_size"
+        update_mode = "update_mode"
+        disable_standalone_ip = "disable_standalone_ip"
+        interactive_lists = "interactive_lists"
+        update_primary_list_by_secondary = "update_primary_list_by_secondary"
         # align_gui_to_scene_on_leaving = "align_gui_to_scene_on_leaving"
 
 AttributeMapping = {

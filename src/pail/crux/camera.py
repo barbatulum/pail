@@ -6,42 +6,35 @@ import maya.mel as mel
 import pymel.all as pm
 
 from . import util
-from .util import undo_dec
+from .contexts import undo_chunk
 
 
-@undo_dec
+@undo_chunk
 def set_clip_plane(cam, near, far):
-    cam.nearClipPlane.set(near)
-    cam.farClipPlane.set(far)
-    return cam, near, far
+    cmds.setAttr(cam + '.nearClipPlane', near)
+    cmds.setAttr(cam + '.farClipPlane', far)
 
 
-def set_image_name(imagePlane, text):
-    if os.path.isfile(text):
-        imagePlane.useFrameExtension.set(0)
-        imagePlane.imageName.set(text)
-        imagePlane.useFrameExtension.set(1)
-        return True
-    elif text == '':
-        imagePlane.imageName.set(text)
-        imagePlane.useFrameExtension.set(0)
-        return True
-    else:
-        return False
-    # reload_image_sequence(imagePlane)
+@undo_chunk
+def set_image_name(image_plane, file_path):
+    cmds.setAttr(image_plane + ".imageName", "")
+    cmds.setAttr(image_plane + ".useFrameExtension", 0)
+    if os.path.isfile(file_path) and os.access(file_path, os.R_OK):
+        cmds.setAttr(image_plane + ".imageName", file_path)
+        cmds.setAttr(image_plane + ".useFrameExtension", 1)
 
 
-def create_new_cam(panel, at_lookAt=True):
+def create_new_cam(panel, look_at=True):
     """ Create new camera """
     cam = None
     if not panel:
-        at_lookAt = False
+        look_at = False
     else:
         current_cam = cmds.modelPanel(panel, q=1, cam=1)
         if not current_cam:
-            at_lookAt = False
+            look_at = False
     new_cam = pm.createNode('camera').getParent()
-    if at_lookAt:
+    if look_at:
         pm.xform(new_cam, ws=1, t=pm.xform(current_cam, q=1, ws=1, t=1))
         pm.xform(new_cam, ws=1, ro=pm.xform(current_cam, q=1, ws=1, ro=1))
         pm.move(new_cam, (0, 0, pm.PyNode(current_cam).centerOfInterest.get() * -1), r=1, os=1, wd=1)
@@ -49,7 +42,7 @@ def create_new_cam(panel, at_lookAt=True):
     return new_cam
 
 
-@undo_dec
+@undo_chunk
 def lock_cam_tsf(cam, lock_it=True):
     for attr in cam.t, cam.r:
         attr.setLocked(lock_it)
@@ -62,7 +55,7 @@ def lock_cam_tsf(cam, lock_it=True):
     camShape.lsr.setLocked(lock_it)
 
 
-@undo_dec
+@undo_chunk
 def reload_image_sequence(imagePlane):
     imagePlane.frameExtension.unlock()
     pm.delete(imagePlane.frameExtension.listConnections())
@@ -87,7 +80,7 @@ def look_thru(imagePlane):
     imagePlane.displayOnlyIfCurrent.set(0)
     imagePlane.displayOnlyIfCurrent.set(1)
 
-@undo_dec
+@undo_chunk
 def bake_to_world2(camera, reset_scale=True):
     min_time = cmds.playbackOptions(q=True, minTime=True)
     max_time = cmds.playbackOptions(q=True, maxTime=True)

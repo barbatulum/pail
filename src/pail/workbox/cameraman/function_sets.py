@@ -261,25 +261,57 @@ def populate_name_preset(parent_widget, parent_layout):
 
     return [parent_widget, group_box]
 
+
 def populate_gui_options(parent_widget, parent_layout):
     group_box = QtWidgets.QGroupBox("GUI Options", parent_widget)
     group_box.setObjectName(ObjectName.NamePresets.group_box)
     parent_layout.addWidget(group_box)
     grid_layout = QtWidgets.QGridLayout(group_box)
 
-    # Camera names
-    label = QtWidgets.QLabel("Disable Update Callbacks", group_box)
+    label = QtWidgets.QLabel("Disable standalone image planes", group_box)
     label.setAlignment(Alignment.right_align)
     grid_layout.addWidget(label, 0, 0, 1, 1)
-    disable_update = QtWidgets.QLineEdit(group_box)
-    disable_update.setObjectName(ObjectName.GUIOptions.disable_update_callback)
-    grid_layout.addWidget(disable_update, 0, 1, 1, 1)
+    disable_standalone_ip = QtWidgets.QCheckBox(group_box)
+    disable_standalone_ip.setObjectName(ObjectName.GUIOptions.disable_standalone_ip)
+    grid_layout.addWidget(disable_standalone_ip, 0, 1, 1, 1)
+
+    label = QtWidgets.QLabel("Interactive Lists", group_box)
+    label.setAlignment(Alignment.right_align)
+    grid_layout.addWidget(label, 0, 0, 1, 1)
+    interactive_lists = QtWidgets.QCheckBox(group_box)
+    interactive_lists.setObjectName(ObjectName.GUIOptions.interactive_lists)
+    grid_layout.addWidget(interactive_lists, 0, 1, 1, 1)
+
+    # Camera names
+    label = QtWidgets.QLabel("Update Primary", group_box)
+    label.setAlignment(Alignment.right_align)
+    grid_layout.addWidget(label, 0, 0, 1, 1)
+    update_primary_list_by_secondary = QtWidgets.QCheckBox(group_box)
+    update_primary_list_by_secondary.setObjectName(ObjectName.GUIOptions.update_primary_list_by_secondary)
+    grid_layout.addWidget(update_primary_list_by_secondary, 0, 1, 1, 1)
 
     label = QtWidgets.QLabel("Align GUI to scene selection", group_box)
     label.setAlignment(Alignment.right_align)
-    grid_layout.addWidget(label, 0, 0, 1, 1)
-    align_gui_to_scene = QtWidgets.QLineEdit(group_box)
+    grid_layout.addWidget(label, 1, 0, 1, 1)
+    align_gui_to_scene = QtWidgets.QCheckBox(group_box)
     align_gui_to_scene.setObjectName(ObjectName.GUIOptions.align_gui_to_scene)
-    grid_layout.addWidget(align_gui_to_scene, 0, 1, 1, 1)
+    grid_layout.addWidget(align_gui_to_scene, 1, 1, 1, 1)
+
+    label = QtWidgets.QLabel("Font Size", group_box)
+    label.setAlignment(Alignment.right_align)
+    grid_layout.addWidget(label, 2, 0, 1, 1)
+    slider = QtWidgets.QSlider(group_box)
+    slider.setOrientation(QtCore.Qt.Horizontal)
+    slider.setObjectName(ObjectName.GUIOptions.font_size)
+    grid_layout.addWidget(slider, 2, 1, 1, 1)
+
+    label = QtWidgets.QLabel("Update Mode", group_box)
+    label.setAlignment(Alignment.right_align)
+    grid_layout.addWidget(label, 3, 0, 1, 1)
+    combo_box = QtWidgets.QComboBox(group_box)
+    combo_box.setObjectName(ObjectName.GUIOptions.update_mode)
+    combo_box.setSizePolicy(SizePolicy.horizontal_expanding)
+    combo_box.addItems(("Immediate", "On Entering", "Manual"))
+    grid_layout.addWidget(combo_box, 3, 1, 1, 1)
 
     return [parent_widget, group_box]

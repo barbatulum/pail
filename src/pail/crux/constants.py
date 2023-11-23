@@ -19,7 +19,30 @@ def get_rotate_order(rotate_order, data_source=om2.MTransformationMatrix):
         return getattr(data_source, "k" + rotate_order.upper())
 
 
-class Om2Error(object):
+class Om2Error:
     OBJECT_EXISTENT = "(kInvalidParameter): Object does not exist"
     NO_MATCHING_NAMESPACE = "No namespace matches name"
     NOT_FROM_REFERENCE = "not from a referenced file"
+
+
+class PanelType:
+    """
+    Since maya.cmds takes strings, Object.KEY is faster then Enum's Object.KEY.value
+    """
+    model_panel = 'modelPanel'
+    graph_editor = 'graphEditor'
+    outliner_panel = 'outlinerPanel'
+    node_editor = 'nodeEditorPanel'
+    scripted_panel = 'scriptedPanel'
+
+
+EditorNameMapping = {
+    'graphEditor': 'GraphEd',
+    'nodeEditorPanel': 'NodeEditorEd'
+}
+
+
+class GraphEditorRetrievingParameters:
+    valid_mode = 'visible'
+    working_order = ('focus', 'visible')
+    reverse_visible_order = False
