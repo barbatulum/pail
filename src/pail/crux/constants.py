@@ -1,6 +1,8 @@
 import maya.api.OpenMaya as om2
 from six import string_types
 
+Organization = "Barbatulum"
+
 RotateOrderStr = ["xyz", "yzx", "zxy", "xzy", "yxz", "zyx"]
 
 class CmdsRotateOrder:
@@ -46,3 +48,15 @@ class GraphEditorRetrievingParameters:
     valid_mode = 'visible'
     working_order = ('focus', 'visible')
     reverse_visible_order = False
+
+
+NodeTypeMFnMapping = {
+    "nurbsCurve": om2.MFn.kNurbsCurve,
+    "locator": om2.MFn.kLocator,
+    "transform": om2.MFn.kTransform,
+    "imagePlane": om2.MFn.kImagePlane,
+    "joint": om2.MFn.kJoint,
+    "camera": om2.MFn.kCamera,
+    "mesh": om2.MFn.kMesh,
+    "nurbsSurface": om2.MFn.kNurbsSurface,
+}

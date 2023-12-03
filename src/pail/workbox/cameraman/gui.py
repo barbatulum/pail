@@ -1,4 +1,5 @@
 from six import string_types
+# todo: save qtsettings as decorator
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om2
@@ -39,10 +40,12 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
         self.central_widget = QtWidgets.QWidget(self)
         self.setCentralWidget(self.central_widget)
         self.central_vertical_layout = QtWidgets.QVBoxLayout(
-            self.central_widget            )
+            self.central_widget
+        )
 
         # top_layout
         self.top_layout = QtWidgets.QVBoxLayout()
+        self.top_layout.setSpacing(3)
         self.central_vertical_layout.addLayout(self.top_layout)
 
         # mid/btm layouts
@@ -78,13 +81,19 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
         #     "⭮", self.central_widget
         # )
         self.link_list_display_qpb = QtWidgets.QPushButton(
-            "🡹🡻", self.central_widget
+            "🡻", self.central_widget
         )
 
         self.link_list_selection_qpb = QtWidgets.QPushButton(
             "🔗", self.central_widget
         )
+
+        self.camera_goodies_target_qpb = QtWidgets.QPushButton(
+            "📺", self.central_widget
+        )
+
         self.link_list_selection_qpb.setCheckable(True)
+        self.link_list_selection_qpb.setChecked(True)
         # ⭮⬇⬆ 🡑 🡓 🡙 ⇧ ⇩ ⇳  ⤒ ⤓ ↨⟰ ⟱ ⇡ ⇣ ⮸ 🠉 🠋🠝 🠟 🡩 🡫🡹 🡻⮝ ⮟🡅 🡇
         # ▲  △╳X✖🗙🞮🞭🞬🞫🗙✘❌⏹⧅⧣⍂⍯⎕⏹⬜
         self.list_option_qhl = QtWidgets.QHBoxLayout()
@@ -92,6 +101,7 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
             self.link_list_selection_qpb,
             # self.toggle_list_order_qpb,
             self.link_list_display_qpb,
+            self.camera_goodies_target_qpb,
         ):
             self.list_option_qhl.addWidget(btn)
 
@@ -103,6 +113,7 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
         self.list_ui_qvl.addWidget(self.image_plane_list)
 
         # Mid layout -> right panel -> function widget
+        # todo: assign hotkey to switch between tabs
         self.functions_tabs = QtWidgets.QTabWidget(self.central_widget)
         self.right_panel_layout.addWidget(self.functions_tabs)
 
@@ -127,6 +138,12 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
 
         parents.update(
             function_sets.populate_viewport_options(
+                parent_widget=self.central_widget,
+                parent_layout=self.top_layout,
+            )
+        )
+        parents.update(
+            function_sets.populate_basic_tools(
                 parent_widget=self.central_widget,
                 parent_layout=self.top_layout,
             )
@@ -182,26 +199,113 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
 
         self.make_pusher(self.main_tab_qvl)
         self.make_pusher(self.config_tab_qvl)
+
         for list_widget in self.camera_list, self.image_plane_list:
             list_widget.itemSelectionChanged.connect(
                 self.on_lists_selection_change
             )
+
+            list_widget.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+            list_widget.customContextMenuRequested.connect(
+                self.pop_up_list_menu
+            )
+            list_widget.doubleClicked.connect(
+                self.select_node
+            )
         # self.toggle_list_order_qpb.clicked.connect(self.switch_list)
         self.link_list_display_qpb.clicked.connect(self.switch_display_update_mode)
+        self.camera_goodies_target_qpb.clicked.connect(self.switch_camera_goodies_target)
 
+        self.populate_camera_goodies()
+        getattr(
+            self, consts.ObjectName.NamePresets.name_presets_field
+        ).setText("masterCam slave_cam ortho_{camera}")
+
+    def populate_camera_goodies(self):
         self.populate_primary_list()
         self.populate_secondary_list()
+    def select_node(self, sender=None):
+        """ Select object when double click on UI listWidgets """
+        if sender is None:
+            sender = self.sender()
+        selected = sender.selectedItems()
+        if selected:
+            nodes = crux.convert_nodes([sl.transform_handle for sl in selected], "partialPath")
+            cmds.select(nodes, replace=True)
 
+    def get_cam_preset_names(self, camera):
+        name_presets = getattr(
+            self, consts.ObjectName.NamePresets.name_presets_field
+        ).text().split()
+        name_presets = [n.format(camera=camera) for n in name_presets if n]
+        return name_presets
 
-    def display_updating_mode(self):
-        return {
-            "🡻": 1, "🡹🡻": 2, "⬜": 0
-        }[self.link_list_display_qpb.text()]
+    # def rename(self):
+    # def create_image_plane(self, viewport=True):
+    #     kwargs = {}
+    #     if camera is not None:
+    #         kwargs["camera"] = camera
+    #     return cmds.imagePlane(**kwargs)
+
+    def pop_up_list_menu(self):
+        sender = self.sender()
+        cam_mode = sender == self.camera_list
+
+        menu = QtWidgets.QMenu(self)
+        if cam_mode:
+            menu.addAction("Look Through")
+
+        if cam_mode:
+            menu.addAction("New Camera", cmds.camera)
+        else:
+            menu.addAction("New Image Plane", cmds.camera)
+            sub_menu = menu.addMenu("Image Plane ...")
+            sub_menu.addAction("New by GUI Selection")
+            sub_menu.addAction("New Standalone")
+
+        menu.addSeparator()
+        menu.addAction(
+            "Select",
+            lambda: self.select_node(sender=sender)
+        )
+
+        if not cam_mode:
+            menu.addAction("Select corresponding camera")
+
+        menu.addAction("Delete")
+        menu.addAction("Clear", self.populate_camera_goodies)
+
+        selected_items = sender.selectedItems()
+        if cam_mode and selected_items:
+            menu.addSeparator()
+            # todo: support multiple selection(camera names)
+            cam_name = "<...>"
+            if len(selected_items) == 1:
+                cam_name = selected_items[0].text()
+            for name in self.get_cam_preset_names(cam_name):
+                menu.addAction("Rename to " + name)
+
+        menu.exec_(QtGui.QCursor(QtCore.Qt.PointingHandCursor).pos())
 
     def is_selection_linked(self):
         return self.link_list_selection_qpb.isChecked()
 
+    def display_updating_mode(self):
+        return {
+            "⬜": 0, "🡻": 1, "🡹🡻": 2
+        }[self.link_list_display_qpb.text()]
 
+    def camera_goodies_target(self):
+        return {
+            "📺": 0, "◯": 1, "∞∞": 2
+        }[self.camera_goodies_target_qpb.text()]
+
+    def switch_camera_goodies_target(self):
+        self.camera_goodies_target_qpb.setText(
+            {
+                "📺": "◯", "◯": "∞∞", "∞∞": "📺"
+            }[self.camera_goodies_target_qpb.text()]
+        )
     def switch_display_update_mode(self):
         self.link_list_display_qpb.setText(
             {
@@ -377,8 +481,6 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
             }
         return selection
 
-
-
     # def get_list_selection(self, selection=None):
     #     """
     #     Get the selection of GUI lists, and/or the actual camera and
@@ -390,12 +492,6 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
     #             list_widget.list_selected_text().values()
     #         )
     #     return selection
-    def on_list_selection_change(self):
-        """
-        Update Cam/IP list selection on the other one changes.
-        e.g. On selecting image plane, the corresponding camera in the cam list
-        should be selected.
-        """
     def get_active_info(self):
         main_node_type = self.get_primary_list_idx()
         cam_first = main_node_type == om2.MFn.kCamera
@@ -404,8 +500,30 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
             ordered_lists = list(reversed(ordered_lists))
 
         return cam_first, main_node_type, ordered_lists
+    def print_selected(self, txt):
+        print("\n"+txt)
+        print("\t",[item.text() for item in self.camera_list.selectedItems()])
+        print("\t",)
+
+    def refresh_and_restore(self):
+        selected_cams = [
+            item.text() for item in self.camera_list.selectedItems()
+        ]
+        selected_ips = [
+            item.text() for item in self.image_plane_list.selectedItems()
+        ]
+        self.populate_camera_goodies()
+        for list_widget, selected in zip(
+            (self.camera_list, self.image_plane_list),
+            (selected_cams, selected_ips),
+        ):
+            for item in list_widget.list_items():
+                if item.text() in selected:
+                    item.setSelected(True)
+
 
     def on_lists_selection_change(self):
+        # todo: When item(s) selected, highlight corresponding cam or ip
         sender = self.sender()
         sender_selected = sender.selectedItems()
         selected_handles = [item.transform_handle for item in sender_selected]
@@ -416,9 +534,9 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
             context_manager = contexts.NullContext
         else:
             context_manager = contexts.QtSignalContext
-
-        if sender == ordered_lists[0] and reverse_updating != 0:
-            self.populate_secondary_list()
+        if sender == ordered_lists[0] and reverse_updating:
+            with contexts.QtSignalContext([ordered_lists[1]], block=True):
+                self.populate_secondary_list()
         elif selection_linked:
             primary_list_items = ordered_lists[0].list_items()
             selecting = []
@@ -447,11 +565,6 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
                                 break
 
 
-
-
-
-
-
     def populate_secondary_list(self):
         cam_first, main_node_type, ordered_lists = self.get_active_info()
         ordered_lists[1].clear()
@@ -466,6 +579,9 @@ class CameramanGUI(QtWidgets.QMainWindow, metaclass=QSingleton):
         if selected_items:
             for item in selected_items:
                 # todo: if not item.transform_handle.isValid(), repopulate and reselect matching name.
+                if not item.transform_handle.isValid():
+                    self.refresh_and_restore()
+                    break
                 _, (camera, camera_shape), image_planes = get_connected_camera_goodies(
                     item.transform_handle
                 )

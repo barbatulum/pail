@@ -1,5 +1,12 @@
+from functools import partial
+import maya.api.OpenMaya as om2
+from maya import cmds
+import shiboken2
+import maya.OpenMayaUI
+import six
 from PySide2 import QtCore, QtGui, QtWidgets
 from ...crux import constants as crux_consts
+from ...shortcuts import select as sc_select
 from . import constants as consts
 from .constants import ObjectName
 
@@ -34,6 +41,92 @@ def populate_viewport_options(parent_widget, parent_layout):
         viewport_options_layout.addWidget(button)
 
         items.append(button)
+    return [parent_widget]
+
+def populate_basic_tools(parent_widget, parent_layout):
+    basic_tools_layout = QtWidgets.QHBoxLayout()
+    parent_layout.addLayout(basic_tools_layout)
+
+    reorder_selection = QtWidgets.QPushButton("⇶", parent_widget)
+    reorder_selection.setObjectName(ObjectName.BasicTools.reorder_selection)
+    basic_tools_layout.addWidget(reorder_selection)
+    full_path = maya.OpenMayaUI.MQtUtil.fullName(
+        six.integer_types[-1](shiboken2.getCppPointer(reorder_selection)[0])
+        )
+    cmds.popupMenu(button=1, allowOptionBoxes=1, mm=1,parent=full_path)
+    cmds.menuItem(label="Select Root Nodes", radialPosition='N', command=lambda *args: sc_select.select_roots())
+    cmds.menuItem(label="Select Hierarchy", radialPosition='S', command=lambda *args: sc_select.select_hierarchy())
+    cmds.menuItem(label="Select First", radialPosition='W', command=lambda *args: sc_select.select_first())
+    cmds.menuItem(label="Select Last", radialPosition='E', command=lambda *args: sc_select.select_last())
+    cmds.menuItem(label="Reverse Selection", command=lambda *args: sc_select.reverse_selection())
+
+    # filter_selection = QtWidgets.QPushButton("∰🏯🏰🛃🐾🎰🧩🌐🕃🔩🧲🔣💦🧾🧿➿⛎", parent_widget)
+    filter_selection = QtWidgets.QPushButton("💦", parent_widget)
+    filter_selection.setObjectName(ObjectName.BasicTools.filter_selection)
+    basic_tools_layout.addWidget(filter_selection)
+    full_path = maya.OpenMayaUI.MQtUtil.fullName(
+        six.integer_types[-1](shiboken2.getCppPointer(filter_selection)[0])
+        )
+    cmds.popupMenu(button=1, allowOptionBoxes=1, mm=1,parent=full_path)
+    cmds.menuItem(
+        label="Select Cameras",
+        radialPosition='W',
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kCamera,)
+        )
+    )
+    cmds.menuItem(
+        label="Select Image Planes",
+        radialPosition='E',
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kImagePlane,)
+        )
+    )
+    cmds.menuItem(
+        label="Filter Presets",
+        radialPosition='N',
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=()
+        )
+    )
+    cmds.menuItem(
+        label="Camera Goodies",
+        radialPosition='S',
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kImagePlane, om2.MFn.kCamera)
+        )
+    )
+    cmds.menuItem(
+        label="Select Meshes",
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kMesh,)
+        )
+    )
+    cmds.menuItem(
+        label="Select Nurbs Curves",
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kNurbsCurve,)
+        )
+    )
+    cmds.menuItem(
+        label="Select Locators",
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kLocator,)
+        )
+    )
+    cmds.menuItem(
+        label="Select Locators & Curves",
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kLocator, om2.MFn.kNurbsCurve)
+        )
+    )
+    cmds.menuItem(
+        label="Select Joints",
+        command=lambda *args: sc_select.select_filtered_selection(
+            node_types=(om2.MFn.kJoint,)
+        )
+    )
+
     return [parent_widget]
 
 
@@ -247,6 +340,7 @@ def populate_playblast(parent_widget, parent_layout):
 
 def populate_name_preset(parent_widget, parent_layout):
     group_box = QtWidgets.QGroupBox("Name Presets", parent_widget)
+    # todo: add validator to check if the name is valid
     group_box.setObjectName(ObjectName.NamePresets.group_box)
     parent_layout.addWidget(group_box)
     grid_layout = QtWidgets.QGridLayout(group_box)
@@ -277,41 +371,41 @@ def populate_gui_options(parent_widget, parent_layout):
 
     label = QtWidgets.QLabel("Interactive Lists", group_box)
     label.setAlignment(Alignment.right_align)
-    grid_layout.addWidget(label, 0, 0, 1, 1)
+    grid_layout.addWidget(label, 1, 0, 1, 1)
     interactive_lists = QtWidgets.QCheckBox(group_box)
     interactive_lists.setObjectName(ObjectName.GUIOptions.interactive_lists)
-    grid_layout.addWidget(interactive_lists, 0, 1, 1, 1)
+    grid_layout.addWidget(interactive_lists, 1, 1, 1, 1)
 
     # Camera names
     label = QtWidgets.QLabel("Update Primary", group_box)
     label.setAlignment(Alignment.right_align)
-    grid_layout.addWidget(label, 0, 0, 1, 1)
+    grid_layout.addWidget(label, 2, 0, 1, 1)
     update_primary_list_by_secondary = QtWidgets.QCheckBox(group_box)
     update_primary_list_by_secondary.setObjectName(ObjectName.GUIOptions.update_primary_list_by_secondary)
-    grid_layout.addWidget(update_primary_list_by_secondary, 0, 1, 1, 1)
+    grid_layout.addWidget(update_primary_list_by_secondary, 2, 1, 1, 1)
 
     label = QtWidgets.QLabel("Align GUI to scene selection", group_box)
     label.setAlignment(Alignment.right_align)
-    grid_layout.addWidget(label, 1, 0, 1, 1)
+    grid_layout.addWidget(label, 3, 0, 1, 1)
     align_gui_to_scene = QtWidgets.QCheckBox(group_box)
     align_gui_to_scene.setObjectName(ObjectName.GUIOptions.align_gui_to_scene)
-    grid_layout.addWidget(align_gui_to_scene, 1, 1, 1, 1)
+    grid_layout.addWidget(align_gui_to_scene, 3, 1, 1, 1)
 
     label = QtWidgets.QLabel("Font Size", group_box)
     label.setAlignment(Alignment.right_align)
-    grid_layout.addWidget(label, 2, 0, 1, 1)
+    grid_layout.addWidget(label, 4, 0, 1, 1)
     slider = QtWidgets.QSlider(group_box)
     slider.setOrientation(QtCore.Qt.Horizontal)
     slider.setObjectName(ObjectName.GUIOptions.font_size)
-    grid_layout.addWidget(slider, 2, 1, 1, 1)
+    grid_layout.addWidget(slider, 4, 1, 1, 1)
 
     label = QtWidgets.QLabel("Update Mode", group_box)
     label.setAlignment(Alignment.right_align)
-    grid_layout.addWidget(label, 3, 0, 1, 1)
+    grid_layout.addWidget(label, 5, 0, 1, 1)
     combo_box = QtWidgets.QComboBox(group_box)
     combo_box.setObjectName(ObjectName.GUIOptions.update_mode)
     combo_box.setSizePolicy(SizePolicy.horizontal_expanding)
     combo_box.addItems(("Immediate", "On Entering", "Manual"))
-    grid_layout.addWidget(combo_box, 3, 1, 1, 1)
+    grid_layout.addWidget(combo_box, 5, 1, 1, 1)
 
     return [parent_widget, group_box]

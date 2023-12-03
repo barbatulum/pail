@@ -65,7 +65,7 @@ def get_panel_info(panel):
     Get the panel info of the given panel
     """
     if not panel:
-        return panel, None, None
+        return panel, "", ""
     panel_type = cmds.getPanel(typeOf=panel)
     editor = ""
     if panel_type in (PanelType.outliner_panel, PanelType.model_panel):
@@ -195,3 +195,7 @@ def set_ui_element_vis(element='ChannelBoxLayerEditor', visible=True):
         kwargs = {"restore": True}
 
     cmds.workspaceControl(element, edit=True, **kwargs)
+
+def get_a_model_panel_with_camera():
+    return cmds.playblast(activeEditor=True)
+

@@ -42,9 +42,15 @@ def convert_node(node, return_type):
     elif return_type == 'shortName':
         return om2.MFnDependencyNode(node).name()
     elif return_type == 'fullPath':
-        return om2.MDagPath.getAPathTo(node).fullPathName()
+        try:
+            return om2.MDagPath.getAPathTo(node).fullPathName()
+        except TypeError:
+            return om2.MFnDependencyNode(node).uniqueName()
     elif return_type == 'partialPath':
-        return om2.MDagPath.getAPathTo(node).partialPathName()
+        try:
+            return om2.MDagPath.getAPathTo(node).partialPathName()
+        except TypeError:
+            return om2.MFnDependencyNode(node).uniqueName()
     else:
         raise TypeError(return_type)
 
@@ -98,7 +104,6 @@ def ls(node_type=om2.MFn.kCamera, return_type=om2.MObject):
         obj = dag_iter.thisNode()
         nodes.append(obj)
         dag_iter.next()
-
     return convert_nodes(nodes, return_type)
 
 

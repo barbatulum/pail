@@ -76,7 +76,7 @@ class ObjectName:
 
     class Camera:
         base = str(om2.MFn.kCamera)
-        group_box = "group_box"
+        group_box = base + "group_box"
         rotate_order = base + "rotate_order"
         far_clip_plane = base + "far_clip_plane"
         near_clip_plane = base + "near_clip_plane"
@@ -84,8 +84,8 @@ class ObjectName:
 
     class ImagePlane:
         base = str(om2.MFn.kImagePlane)
-        attributes_group_box = "attributes_group_box"
-        cmds_group_box = "cmds_group_box"
+        attributes_group_box = base + "attributes_group_box"
+        cmds_group_box = base + "cmds_group_box"
         alpha_gain = base + "alpha_gain"
         browse_image_path = base + "browse_image_path"
         color_space = base + "color_space"
@@ -100,37 +100,44 @@ class ObjectName:
 
     class TransformBake:
         base = "_cameraman_transform_bake_"
-        group_box = "group_box"
+        group_box = base + "group_box"
         reset_scale = base + "reset_scale"
         rotate_order = base + "rotate_order"
         do_bake = base + "do_bake"
 
     class Notes:
         base = "_cameraman_notes_"
-        group_box = "group_box"
+        group_box = base + "group_box"
         notes_content = base + "notes_content"
 
     class Playblast:
         base = "_cameraman_playblast_"
-        group_box = "group_box"
+        group_box = base + "group_box"
         do_playblast = base + "do_playblast"
         options = base + "options"
 
     class NamePresets:
         base = "_cameraman_name_presets_"
-        group_box = "group_box"
+        group_box = base + "group_box"
         name_presets_field = "name_presets_field"
 
     class GUIOptions:
         base = "_cameraman_gui_options_"
-        group_box = "group_box"
-        disable_update_callback = "disable_update_callback"
-        align_gui_to_scene = "align_gui_to_scene"
-        font_size = "font_size"
-        update_mode = "update_mode"
-        disable_standalone_ip = "disable_standalone_ip"
-        interactive_lists = "interactive_lists"
-        update_primary_list_by_secondary = "update_primary_list_by_secondary"
+        group_box = base+ "group_box"
+        disable_update_callback = base+"disable_update_callback"
+        align_gui_to_scene = base+"align_gui_to_scene"
+        font_size = base+"font_size"
+        update_mode = base+"update_mode"
+        disable_standalone_ip = base+"disable_standalone_ip"
+        interactive_lists = base+"interactive_lists"
+        update_primary_list_by_secondary = base+"update_primary_list_by_secondary"
+        # align_gui_to_scene_on_leaving = "align_gui_to_scene_on_leaving"
+
+    class BasicTools:
+        base = "_cameraman_basic_tools_"
+        reorder_selection = base + "reorder_selection"
+        filter_selection = "filter_selection"
+
         # align_gui_to_scene_on_leaving = "align_gui_to_scene_on_leaving"
 
 AttributeMapping = {
